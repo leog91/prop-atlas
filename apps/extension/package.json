@@ -1,0 +1,47 @@
+{
+  "name": "@prop-atlas/extension",
+  "displayName": "Prop Atlas",
+  "version": "0.1.0",
+  "description": "Save property listings from Daft, Idealista, Kamernet, and Zonaprop",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build && node scripts/postbuild.js",
+    "package": "plasmo package",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prop-atlas/providers": "workspace:*",
+    "@prop-atlas/types": "workspace:*",
+    "plasmo": "0.90.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.0.268",
+    "@types/node": "20.11.5",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "typescript": "5.3.3"
+  },
+  "manifest": {
+    "host_permissions": [
+      "https://*.daft.ie/*",
+      "https://daft.ie/*",
+      "https://*.idealista.com/*",
+      "https://idealista.com/*",
+      "https://*.idealista.es/*",
+      "https://idealista.es/*",
+      "https://*.idealista.it/*",
+      "https://idealista.it/*",
+      "https://*.idealista.pt/*",
+      "https://idealista.pt/*",
+      "https://*.kamernet.nl/*",
+      "https://kamernet.nl/*",
+      "https://*.zonaprop.com.ar/*",
+      "https://zonaprop.com.ar/*"
+    ],
+    "permissions": ["activeTab", "storage"]
+  }
+}
