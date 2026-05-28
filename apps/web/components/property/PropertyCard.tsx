@@ -1,6 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+
+const PROVIDER_COUNTRY: Record<string, string> = {
+  daft: "ireland",
+  kamernet: "netherlands",
+  idealista: "spain",
+  zonaprop: "argentina",
+};
+
+const FLAGS: Record<string, ReactNode> = {
+  ireland: (
+    <svg viewBox="0 0 36 27" className="h-3 w-4 rounded-sm">
+      <rect width="12" height="27" fill="#009A49" />
+      <rect x="12" width="12" height="27" fill="#FFFFFF" />
+      <rect x="24" width="12" height="27" fill="#FF7900" />
+    </svg>
+  ),
+  netherlands: (
+    <svg viewBox="0 0 36 27" className="h-3 w-4 rounded-sm">
+      <rect width="36" height="9" fill="#AE1C28" />
+      <rect y="9" width="36" height="9" fill="#FFFFFF" />
+      <rect y="18" width="36" height="9" fill="#21468B" />
+    </svg>
+  ),
+  spain: (
+    <svg viewBox="0 0 36 27" className="h-3 w-4 rounded-sm">
+      <rect width="36" height="6.75" fill="#AA151B" />
+      <rect y="6.75" width="36" height="13.5" fill="#F1BF00" />
+      <rect y="20.25" width="36" height="6.75" fill="#AA151B" />
+    </svg>
+  ),
+  argentina: (
+    <svg viewBox="0 0 36 27" className="h-3 w-4 rounded-sm">
+      <rect width="36" height="9" fill="#74ACDF" />
+      <rect y="9" width="36" height="9" fill="#FFFFFF" />
+      <rect y="18" width="36" height="9" fill="#74ACDF" />
+    </svg>
+  ),
+};
+
+function FlagIcon({ country }: { country: string }) {
+  return <>{FLAGS[country] || null}</>;
+}
 
 interface PropertyCardProps {
   property: {
@@ -171,7 +213,8 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
           <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
             {property.listingType === "rent" ? "Rent" : "Buy"}
           </span>
-          <span className="rounded bg-gray-900/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+          <span className="flex items-center gap-1 rounded bg-gray-900/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+            <FlagIcon country={PROVIDER_COUNTRY[property.provider]} />
             {property.provider}
           </span>
         </div>
