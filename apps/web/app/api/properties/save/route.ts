@@ -189,6 +189,11 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       propertyId,
     });
+  } else if (existingSave[0].deletedAt != null) {
+    await db
+      .update(savedProperties)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(eq(savedProperties.id, existingSave[0].id));
   }
 
   return NextResponse.json(

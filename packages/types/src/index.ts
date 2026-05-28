@@ -81,6 +81,7 @@ export interface SavedProperty {
   propertyId: string;
   notes: string | null;
   isFavorite: boolean;
+  deletedAt: Date | null;
   savedAt: Date;
   updatedAt: Date;
 }

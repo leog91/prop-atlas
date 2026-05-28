@@ -24,11 +24,14 @@ interface PropertyCardProps {
     views?: number | null;
   };
   onToggleFavorite?: (id: string) => void;
+  showDeleted?: boolean;
+  onRemove?: (id: string) => void;
 }
 
-export function PropertyCard({ property, onToggleFavorite }: PropertyCardProps) {
+export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove }: PropertyCardProps) {
   const [isFav, setIsFav] = useState(property.isFavorite);
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleFavorite = async () => {
     if (loading) return;
@@ -44,6 +47,21 @@ export function PropertyCard({ property, onToggleFavorite }: PropertyCardProps) 
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteToggle = async () => {
+    if (deleteLoading) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/properties/${property.id}/delete`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        onRemove?.(property.id);
+      }
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -92,7 +110,7 @@ export function PropertyCard({ property, onToggleFavorite }: PropertyCardProps) 
   const mainImage = property.images[0] || "/placeholder-property.svg";
 
   return (
-    <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <div className={`group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${showDeleted ? "opacity-60 grayscale" : ""}`}>
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
         <img
           src={mainImage}
@@ -100,25 +118,55 @@ export function PropertyCard({ property, onToggleFavorite }: PropertyCardProps) 
           loading="lazy"
           className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105"
         />
-        <button
-          onClick={handleFavorite}
-          disabled={loading}
-          className="absolute right-2 top-2 rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
-          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-        >
-          <svg
-            className={`h-5 w-5 ${isFav ? "fill-red-500 text-red-500" : "fill-none text-gray-600 dark:text-gray-400"}`}
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+        <div className="absolute right-2 top-2 flex gap-2">
+          <button
+            onClick={handleFavorite}
+            disabled={loading}
+            className="rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
+            aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-            />
-          </svg>
-        </button>
+            <svg
+              className={`h-5 w-5 ${isFav ? "fill-red-500 text-red-500" : "fill-none text-gray-600 dark:text-gray-400"}`}
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={handleDeleteToggle}
+            disabled={deleteLoading}
+            className="rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
+            aria-label={showDeleted ? "Restore property" : "Delete property"}
+          >
+            <svg
+              className="h-5 w-5 text-gray-600 dark:text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              {showDeleted ? (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              )}
+            </svg>
+          </button>
+        </div>
         <div className="absolute left-2 top-2 flex gap-1">
           <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
             {property.listingType === "rent" ? "Rent" : "Buy"}

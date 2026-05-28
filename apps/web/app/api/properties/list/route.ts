@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, and, desc, inArray } from "@prop-atlas/db";
+import { eq, and, desc, inArray, isNull, isNotNull } from "@prop-atlas/db";
 import { properties, propertyImages, savedProperties } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
@@ -13,10 +13,16 @@ export async function GET(request: Request) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
   const offset = (page - 1) * limit;
   const favoritesOnly = searchParams.get("favorites") === "true";
+  const showDeleted = searchParams.get("deleted") === "true";
 
   const db = getDb();
 
   const conditions = [eq(savedProperties.userId, session.user.id)];
+  if (showDeleted) {
+    conditions.push(isNotNull(savedProperties.deletedAt));
+  } else {
+    conditions.push(isNull(savedProperties.deletedAt));
+  }
   if (favoritesOnly) {
     conditions.push(eq(savedProperties.isFavorite, true));
   }

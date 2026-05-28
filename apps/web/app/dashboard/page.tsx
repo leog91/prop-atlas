@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { eq, and, desc, inArray, like, sql } from "@prop-atlas/db";
+import { eq, and, desc, inArray, like, sql, isNull, isNotNull } from "@prop-atlas/db";
 import { properties, propertyImages, savedProperties } from "@prop-atlas/db";
 import { getDb } from "@/lib/db";
 import { DashboardContent } from "@/components/property/DashboardContent";
@@ -15,6 +15,7 @@ interface DashboardPageProps {
     search?: string;
     listingType?: string;
     provider?: string;
+    deleted?: string;
   }>;
 }
 
@@ -35,10 +36,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const search = params.search || "";
   const listingType = params.listingType || "";
   const provider = params.provider || "";
+  const showDeleted = params.deleted === "true";
 
   const db = getDb();
 
   const conditions = [eq(savedProperties.userId, session.user.id)];
+  if (showDeleted) {
+    conditions.push(isNotNull(savedProperties.deletedAt));
+  } else {
+    conditions.push(isNull(savedProperties.deletedAt));
+  }
   if (favoritesOnly) {
     conditions.push(eq(savedProperties.isFavorite, true));
   }
@@ -54,7 +61,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     propertyConditions.push(eq(properties.provider, provider));
   }
 
-  let query = db
+  const query = db
     .select({
       property: properties,
       saved: savedProperties,
@@ -109,6 +116,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ...(search ? { search } : {}),
       ...(listingType ? { listingType } : {}),
       ...(provider ? { provider } : {}),
+      ...(showDeleted ? { deleted: "true" } : {}),
       ...overrides,
     };
     for (const [k, v] of Object.entries(merged)) {
@@ -153,7 +161,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">
-            Saved Properties
+            {showDeleted ? "Trash" : "Saved Properties"}
             <span className="ml-2 text-sm font-normal text-gray-500">
               ({total})
             </span>
@@ -163,6 +171,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <form action="/dashboard" method="GET" className="flex gap-2">
             {favoritesOnly && <input type="hidden" name="favorites" value="true" />}
+            {showDeleted && <input type="hidden" name="deleted" value="true" />}
             {listingType && <input type="hidden" name="listingType" value={listingType} />}
             {provider && <input type="hidden" name="provider" value={provider} />}
             <input
@@ -190,6 +199,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               }`}
             >
               Favorites
+            </Link>
+            <Link
+              href={buildUrl({ deleted: showDeleted ? "" : "true", page: "1", favorites: "", listingType: "", provider: "" })}
+              className={`rounded-md px-3 py-1.5 text-sm ${
+                showDeleted
+                  ? "bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900"
+                  : "border border-gray-300 dark:border-gray-700"
+              }`}
+            >
+              Trash
             </Link>
             {["", "rent", "buy"].map((type) => (
               <Link
@@ -223,14 +242,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {data.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-gray-500">
-              {search || favoritesOnly || listingType || provider
-                ? "No properties match your filters."
-                : "No saved properties yet. Use the browser extension to save listings."}
+              {showDeleted
+                ? "Trash is empty."
+                : search || favoritesOnly || listingType || provider
+                  ? "No properties match your filters."
+                  : "No saved properties yet. Use the browser extension to save listings."}
             </p>
           </div>
         ) : (
           <>
-            <DashboardContent properties={data} />
+            <DashboardContent
+              key={data.map((d) => d.id).join(",")}
+              properties={data}
+              showDeleted={showDeleted}
+            />
 
             {totalPages > 1 && (
               <div className="mt-8 flex items-center justify-center gap-2">

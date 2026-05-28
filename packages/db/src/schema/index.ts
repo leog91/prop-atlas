@@ -95,6 +95,7 @@ export const savedProperties = sqliteTable(
       .references(() => properties.id, { onDelete: "cascade" }),
     notes: text("notes"),
     isFavorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
+    deletedAt: integer("deleted_at", { mode: "timestamp" }),
     savedAt: integer("saved_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -109,6 +110,7 @@ export const savedProperties = sqliteTable(
     ),
     index("saved_properties_user_id_idx").on(table.userId),
     index("saved_properties_is_favorite_idx").on(table.isFavorite),
+    index("saved_properties_deleted_at_idx").on(table.deletedAt),
   ]
 );
 
