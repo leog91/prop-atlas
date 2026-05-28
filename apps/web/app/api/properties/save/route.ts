@@ -374,10 +374,14 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       propertyId,
     });
-  } else if (existingSave[0].deletedAt != null) {
+  } else {
+    const updates: { deletedAt?: null; updatedAt: Date } = { updatedAt: new Date() };
+    if (existingSave[0].deletedAt != null) {
+      updates.deletedAt = null;
+    }
     await db
       .update(savedProperties)
-      .set({ deletedAt: null, updatedAt: new Date() })
+      .set(updates)
       .where(eq(savedProperties.id, existingSave[0].id));
   }
 

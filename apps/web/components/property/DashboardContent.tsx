@@ -33,6 +33,10 @@ interface Property {
   latitude?: number | null;
   longitude?: number | null;
   rawPayload?: unknown;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+  savedAt?: Date | string | null;
+  savedUpdatedAt?: Date | string | null;
 }
 
 interface DashboardContentProps {

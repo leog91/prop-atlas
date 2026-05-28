@@ -104,6 +104,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     images: (imagesByProperty.get(property.id) || [])
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((i) => i.url),
+    savedAt: saved.savedAt,
+    savedUpdatedAt: saved.updatedAt,
     isFavorite: saved.isFavorite,
     notes: saved.notes,
   }));

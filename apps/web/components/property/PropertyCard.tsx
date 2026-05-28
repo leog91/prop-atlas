@@ -64,6 +64,10 @@ interface PropertyCardProps {
     url: string;
     listedAt?: string | null;
     views?: number | null;
+    createdAt?: Date | string | null;
+    updatedAt?: Date | string | null;
+    savedAt?: Date | string | null;
+    savedUpdatedAt?: Date | string | null;
   };
   onToggleFavorite?: (id: string) => void;
   showDeleted?: boolean;
@@ -133,7 +137,8 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
     }).format(price);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (input: string | Date) => {
+    const dateStr = typeof input === 'string' ? input : input.toISOString();
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) {
       const match = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -284,6 +289,29 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
             {property.views != null && (
               <span>{property.views.toLocaleString()} views</span>
             )}
+          </div>
+        )}
+
+        {(property.savedAt || property.updatedAt) && (
+          <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+            {property.savedAt && (() => {
+              const { formatted, relative } = formatDate(property.savedAt);
+              return (
+                <span>
+                  Saved {formatted}
+                  {relative && ` (${relative})`}
+                </span>
+              );
+            })()}
+            {property.updatedAt && (() => {
+              const { formatted, relative } = formatDate(property.updatedAt);
+              return (
+                <span>
+                  Updated {formatted}
+                  {relative && ` (${relative})`}
+                </span>
+              );
+            })()}
           </div>
         )}
 
