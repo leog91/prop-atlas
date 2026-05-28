@@ -42,7 +42,42 @@ function parseListedDate(value?: string): Date | null {
     const [, day, month, year] = match;
     return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
   }
+  const spanishMatch = value.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)/i);
+  if (spanishMatch) {
+    const [, day, monthName] = spanishMatch;
+    const month = parseSpanishMonth(monthName);
+    if (month == null) return null;
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const parsed = new Date(year, month, parseInt(day, 10), 12);
+    if (parsed.getTime() - now.getTime() > 24 * 60 * 60 * 1000) {
+      parsed.setFullYear(year - 1);
+    }
+
+    return parsed;
+  }
   return null;
+}
+
+function parseSpanishMonth(month: string): number | undefined {
+  const months: Record<string, number> = {
+    enero: 0,
+    febrero: 1,
+    marzo: 2,
+    abril: 3,
+    mayo: 4,
+    junio: 5,
+    julio: 6,
+    agosto: 7,
+    septiembre: 8,
+    setiembre: 8,
+    octubre: 9,
+    noviembre: 10,
+    diciembre: 11,
+  };
+
+  return months[month.toLowerCase()];
 }
 
 function getRawPayload(data: unknown): Record<string, unknown> {
@@ -53,11 +88,15 @@ function stripLocationLabel(value: string) {
   return value.replace(/^(urb\.?|barrio|distrito|área|area)\s+/i, "").trim();
 }
 
+function isAddressNoise(value: string) {
+  return /^(ampliar mapa|ver mapa|mapa)$/i.test(value.trim());
+}
+
 function getAddressParts(address?: string) {
   return (address || "")
     .split(",")
     .map((part) => part.trim())
-    .filter(Boolean);
+    .filter((part) => part.length > 0 && !isAddressNoise(part));
 }
 
 function inferCity(addressParts: string[], city?: string) {
@@ -68,6 +107,12 @@ function inferCity(addressParts: string[], city?: string) {
   });
 
   return inferred ? stripLocationLabel(inferred) : undefined;
+}
+
+function joinGeocodeQuery(parts: Array<string | undefined>, country?: string) {
+  const cleanedParts = parts.filter((part): part is string => !!part && part.trim().length > 0);
+  const hasSpecificPlace = cleanedParts.some((part) => part !== country);
+  return hasSpecificPlace ? cleanedParts.join(", ") : "";
 }
 
 function getAddressGeocodeQueries(address?: string, city?: string, country?: string) {
@@ -81,15 +126,15 @@ function getAddressGeocodeQueries(address?: string, city?: string, country?: str
   const cleanedArea = parts.find((part) => /^(área|area)\b/i.test(part));
 
   return [
-    [street, postalCode, inferredCity, country],
-    [street, inferredCity, country],
-    [stripLocationLabel(urbanization || ""), inferredCity, country],
-    [stripLocationLabel(neighborhood || ""), inferredCity, country],
-    [stripLocationLabel(district || ""), inferredCity, country],
-    [stripLocationLabel(cleanedArea || ""), country],
-    [address, city, country],
-    [inferredCity, country],
-  ].map((queryParts) => queryParts.filter(Boolean).join(", "));
+    joinGeocodeQuery([street, postalCode, inferredCity, country], country),
+    joinGeocodeQuery([street, inferredCity, country], country),
+    joinGeocodeQuery([stripLocationLabel(urbanization || ""), inferredCity, country], country),
+    joinGeocodeQuery([stripLocationLabel(neighborhood || ""), inferredCity, country], country),
+    joinGeocodeQuery([stripLocationLabel(district || ""), inferredCity, country], country),
+    joinGeocodeQuery([stripLocationLabel(cleanedArea || ""), country], country),
+    joinGeocodeQuery([parts.join(", "), city, country], country),
+    joinGeocodeQuery([inferredCity, country], country),
+  ];
 }
 
 function getGeocodeQueries(data: {
@@ -130,6 +175,14 @@ async function geocodeQuery(query: string): Promise<{ latitude: number; longitud
   }
 }
 
+function normalizeIncomingPrice(data: { provider: string; price: number }) {
+  if (data.provider === "idealista" && data.price > 0 && data.price < 100 && !Number.isInteger(data.price)) {
+    return Math.round(data.price * 1000);
+  }
+
+  return data.price;
+}
+
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   const { session, error } = await requireAuth(request);
@@ -153,6 +206,7 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
   const db = getDb();
+  const price = normalizeIncomingPrice(data);
   const incomingRawPayload = getRawPayload(data.rawPayload);
   const incomingApproximate =
     incomingRawPayload.isApproximateLocation === true ||
@@ -209,11 +263,11 @@ export async function POST(request: NextRequest) {
     const existingProperty = existing[0];
     propertyId = existingProperty.id;
 
-    if (existingProperty.price !== data.price) {
+    if (existingProperty.price !== price) {
       await db.insert(propertyPriceHistory).values({
         id: crypto.randomUUID(),
         propertyId,
-        price: data.price,
+        price,
         currency: data.currency,
       });
     }
@@ -223,7 +277,7 @@ export async function POST(request: NextRequest) {
       .set({
         title: data.title,
         description: data.description ?? null,
-        price: data.price,
+        price,
         currency: data.currency,
         propertyType: data.propertyType,
         bedrooms: data.bedrooms ?? null,
@@ -265,7 +319,7 @@ export async function POST(request: NextRequest) {
       listingType: data.listingType,
       title: data.title,
       description: data.description ?? null,
-      price: data.price,
+      price,
       currency: data.currency,
       propertyType: data.propertyType,
       bedrooms: data.bedrooms ?? null,
@@ -298,7 +352,7 @@ export async function POST(request: NextRequest) {
     await db.insert(propertyPriceHistory).values({
       id: crypto.randomUUID(),
       propertyId,
-      price: data.price,
+      price,
       currency: data.currency,
     });
   }

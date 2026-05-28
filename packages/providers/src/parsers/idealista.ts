@@ -28,6 +28,7 @@ export class IdealistaParser implements ProviderParser {
     const country = this.detectCountry(document.URL);
     const location = this.extractLocation(document);
     const coords = this.extractCoordinates(document);
+    const listingDate = this.extractListingDate(document);
     const displayAddress = location.isApproximate
       ? location.address ?? jsonLd?.address
       : jsonLd?.address ?? location.address;
@@ -53,10 +54,12 @@ export class IdealistaParser implements ProviderParser {
       longitude: jsonLd?.longitude ?? meta.longitude ?? coords.longitude,
       images,
       url: document.URL,
+      listedAt: listingDate?.isoDate,
       rawPayload: {
         jsonLd,
         meta,
         dom,
+        idealistaUpdatedAtText: listingDate?.sourceText,
         isApproximateLocation: location.isApproximate,
         locationPrecision: location.isApproximate ? "approximate" : "exact",
         locationRadiusMeters: location.isApproximate ? 650 : undefined,
@@ -187,6 +190,7 @@ export class IdealistaParser implements ProviderParser {
         return (
           line.length > 0 &&
           !/privacidad|privacidade|privacy|no ha indicado la ubicaci/i.test(line) &&
+          !/^(ampliar mapa|ver mapa|mapa)$/i.test(line) &&
           !/^(ubicaci(o|ó)n|location|localiza(ç|c)(a|ã)o)$/i.test(line)
         );
       });
@@ -207,7 +211,7 @@ export class IdealistaParser implements ProviderParser {
   }
 
   private extractCity(parts: string[]): string | undefined {
-    const ignored = /^(barrio|distrito|urb\.?|area|área)\b/i;
+    const ignored = /^(barrio|distrito|urb\.?|area|área|ampliar mapa|ver mapa|mapa)\b/i;
     const city = [...parts].reverse().find((part) => {
       return !ignored.test(part) && !/\b\d{4,5}\b/.test(part) && !part.includes(",");
     });
@@ -231,7 +235,7 @@ export class IdealistaParser implements ProviderParser {
       [location.address, city, country],
     ]
       .map((parts) => parts.filter(Boolean).join(", "))
-      .filter((query) => query.trim().length > 0);
+      .filter((query) => query.trim().length > 0 && query !== country);
 
     return Array.from(new Set(queries));
   }
@@ -291,17 +295,41 @@ export class IdealistaParser implements ProviderParser {
   private parsePrice(value?: string | number | null): number | undefined {
     if (value == null) return undefined;
     if (typeof value === "number") return value || undefined;
-    const cleaned = value.replace(/[^\d.,]/g, "").replace(",", ".");
-    const match = cleaned.match(/[\d.]+/);
-    return match ? parseFloat(match[0]) : undefined;
+    return this.parseLocalizedNumber(value);
   }
 
   private parseArea(value?: string | number | null): number | undefined {
     if (!value) return undefined;
     if (typeof value === "number") return value;
-    const cleaned = value.replace(/[^\d.,]/g, "").replace(",", ".");
-    const match = cleaned.match(/[\d.]+/);
-    return match ? parseFloat(match[0]) : undefined;
+    return this.parseLocalizedNumber(value);
+  }
+
+  private parseLocalizedNumber(value: string): number | undefined {
+    const match = value.match(/\d[\d.,]*/);
+    if (!match) return undefined;
+
+    let normalized = match[0];
+    const lastDot = normalized.lastIndexOf(".");
+    const lastComma = normalized.lastIndexOf(",");
+
+    if (lastDot !== -1 && lastComma !== -1) {
+      const decimalSeparator = lastDot > lastComma ? "." : ",";
+      const thousandSeparator = decimalSeparator === "." ? "," : ".";
+      normalized = normalized
+        .replace(new RegExp(`\\${thousandSeparator}`, "g"), "")
+        .replace(decimalSeparator, ".");
+    } else if (lastDot !== -1) {
+      normalized = /\.\d{3}(\D|$)/.test(normalized)
+        ? normalized.replace(/\./g, "")
+        : normalized;
+    } else if (lastComma !== -1) {
+      normalized = /,\d{3}(\D|$)/.test(normalized)
+        ? normalized.replace(/,/g, "")
+        : normalized.replace(",", ".");
+    }
+
+    const parsed = parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   private extractBedrooms(text?: string | null): number | undefined {
@@ -382,5 +410,49 @@ export class IdealistaParser implements ProviderParser {
     }
 
     return {};
+  }
+
+  private extractListingDate(document: Document): { isoDate: string; sourceText: string } | undefined {
+    const bodyText = document.body.textContent?.replace(/\s+/g, " ") || "";
+    const match = bodyText.match(/Anuncio actualizado el\s+(\d{1,2})\s+de\s+([a-záéíóúñ]+)/i);
+    if (!match) return undefined;
+
+    const [, day, monthName] = match;
+    const month = this.parseSpanishMonth(monthName);
+    if (month == null) return undefined;
+
+    const now = new Date();
+    let year = now.getFullYear();
+    const parsed = new Date(year, month, parseInt(day, 10), 12);
+
+    if (parsed.getTime() - now.getTime() > 24 * 60 * 60 * 1000) {
+      year -= 1;
+      parsed.setFullYear(year);
+    }
+
+    return {
+      isoDate: parsed.toISOString(),
+      sourceText: match[0],
+    };
+  }
+
+  private parseSpanishMonth(month: string): number | undefined {
+    const months: Record<string, number> = {
+      enero: 0,
+      febrero: 1,
+      marzo: 2,
+      abril: 3,
+      mayo: 4,
+      junio: 5,
+      julio: 6,
+      agosto: 7,
+      septiembre: 8,
+      setiembre: 8,
+      octubre: 9,
+      noviembre: 10,
+      diciembre: 11,
+    };
+
+    return months[month.toLowerCase()];
   }
 }
