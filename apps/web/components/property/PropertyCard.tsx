@@ -172,10 +172,10 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
   return (
     <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={mainImage}
           alt={property.title}
-          loading="lazy"
           className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 ${showDeleted ? "grayscale opacity-60" : ""}`}
         />
         <div className="absolute right-2 top-2 flex gap-2">

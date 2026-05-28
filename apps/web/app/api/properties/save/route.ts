@@ -6,6 +6,14 @@ import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
 import crypto from "crypto";
 
+const isDevelopment = process.env.NODE_ENV === "development";
+
+function debugLog(...args: Parameters<typeof console.log>) {
+  if (isDevelopment) {
+    console.log(...args);
+  }
+}
+
 function corsHeaders(origin: string | null) {
   return {
     "Access-Control-Allow-Origin": origin || "*",
@@ -132,11 +140,11 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  console.log("[SAVE] Received payload:", JSON.stringify(body, null, 2));
+  debugLog("[SAVE] Received payload:", JSON.stringify(body, null, 2));
   const parsed = propertySchema.safeParse(body);
 
   if (!parsed.success) {
-    console.log("[SAVE] Validation errors:", JSON.stringify(parsed.error.flatten(), null, 2));
+    debugLog("[SAVE] Validation errors:", JSON.stringify(parsed.error.flatten(), null, 2));
     return NextResponse.json(
       { error: "Invalid payload", details: parsed.error.flatten() },
       { status: 400, headers: corsHeaders(origin) }
@@ -156,25 +164,25 @@ export async function POST(request: NextRequest) {
   let geocodeQueryUsed: string | undefined;
 
   if (latitude == null || longitude == null) {
-    console.log("[GEOCODE] No coordinates found, attempting geocoding...");
-    console.log("[GEOCODE] Address:", data.address, "City:", data.city, "Country:", data.country);
+    debugLog("[GEOCODE] No coordinates found, attempting geocoding...");
+    debugLog("[GEOCODE] Address:", data.address, "City:", data.city, "Country:", data.country);
     for (const query of getGeocodeQueries({ ...data, rawPayload: incomingRawPayload })) {
-      console.log("[GEOCODE] Trying:", query);
+      debugLog("[GEOCODE] Trying:", query);
       const geocoded = await geocodeQuery(query);
       if (geocoded) {
         latitude = geocoded.latitude;
         longitude = geocoded.longitude;
         isApproximateLocation = true;
         geocodeQueryUsed = query;
-        console.log("[GEOCODE] ✓ Success:", { query, ...geocoded });
+        debugLog("[GEOCODE] Success:", { query, ...geocoded });
         break;
       }
     }
     if (latitude == null || longitude == null) {
-      console.log("[GEOCODE] ✗ Failed to geocode");
+      debugLog("[GEOCODE] Failed to geocode");
     }
   } else {
-    console.log("[GEOCODE] Using provided coordinates:", { latitude, longitude });
+    debugLog("[GEOCODE] Using provided coordinates:", { latitude, longitude });
   }
 
   const rawPayload = {

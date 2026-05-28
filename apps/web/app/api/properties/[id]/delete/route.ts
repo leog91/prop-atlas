@@ -4,7 +4,7 @@ import { savedProperties, properties, propertyImages, propertyPriceHistory } fro
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
   if (error) return error;
 
@@ -40,31 +40,45 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json({ deleted: !isDeleted });
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
   if (error) return error;
 
   const { id } = await params;
   const db = getDb();
 
-  // Delete the saved_properties record for this user
-  await db
-    .delete(savedProperties)
+  const existing = await db
+    .select()
+    .from(savedProperties)
     .where(
       and(
         eq(savedProperties.userId, session.user.id),
         eq(savedProperties.propertyId, id)
       )
-    );
+    )
+    .limit(1);
 
-  // Check if any other users have this property saved
+  if (existing.length === 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (existing[0].deletedAt == null) {
+    return NextResponse.json(
+      { error: "Property must be in trash before permanent deletion" },
+      { status: 409 }
+    );
+  }
+
+  await db
+    .delete(savedProperties)
+    .where(eq(savedProperties.id, existing[0].id));
+
   const otherSaves = await db
     .select()
     .from(savedProperties)
     .where(eq(savedProperties.propertyId, id))
     .limit(1);
 
-  // If no other users have it, delete the property and related data
   if (otherSaves.length === 0) {
     await db.delete(propertyImages).where(eq(propertyImages.propertyId, id));
     await db.delete(propertyPriceHistory).where(eq(propertyPriceHistory.propertyId, id));

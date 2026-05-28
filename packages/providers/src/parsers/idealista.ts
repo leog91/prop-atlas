@@ -351,27 +351,7 @@ export class IdealistaParser implements ProviderParser {
       }
     }
 
-    // 2. Check all script tags for coordinate patterns
-    const scripts = document.querySelectorAll("script");
-    for (const script of scripts) {
-      const text = script.textContent || "";
-      // Look for patterns like "latitude":41.3851 or lat:41.3851
-      const latMatch =
-        text.match(/"latitude"\s*:\s*(-?[\d.]+)/) ||
-        text.match(/\blat(?:itude)?\s*:\s*(-?[\d.]+)/i);
-      const lngMatch =
-        text.match(/"longitude"\s*:\s*(-?[\d.]+)/) ||
-        text.match(/\b(?:lng|lon|longitude)\s*:\s*(-?[\d.]+)/i);
-      if (latMatch && lngMatch) {
-        const lat = parseFloat(latMatch[1]);
-        const lng = parseFloat(lngMatch[1]);
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          return { latitude: lat, longitude: lng };
-        }
-      }
-    }
-
-    // 3. Check for JSON-LD with geo but different structure
+    // 2. Check for JSON-LD with geo but different structure
     const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
     for (const script of ldScripts) {
       try {
@@ -392,7 +372,7 @@ export class IdealistaParser implements ProviderParser {
       } catch {}
     }
 
-    // 4. Check for meta tags with various names
+    // 3. Check for meta tags with various names
     const getMeta = (name: string) =>
       document.querySelector(`meta[property="${name}"], meta[name="${name}"]`)?.getAttribute("content");
     const metaLat = parseFloat(getMeta("og:latitude") || getMeta("latitude") || "");

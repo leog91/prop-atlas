@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { eq } from "@prop-atlas/db";
 import { apiKeys } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
 import crypto from "crypto";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const { session, error } = await requireAuth();
   if (error) return error;
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ key });
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const { session, error } = await requireAuth();
   if (error) return error;
 
