@@ -129,12 +129,12 @@ export class ZonapropParser implements ProviderParser {
     return PropertyType.OTHER;
   }
 
-  private parsePrice(value?: string | number | null): number {
-    if (!value) return 0;
-    if (typeof value === "number") return value;
+  private parsePrice(value?: string | number | null): number | undefined {
+    if (value == null) return undefined;
+    if (typeof value === "number") return value || undefined;
     const cleaned = value.replace(/[^\d.,]/g, "").replace(",", "");
     const match = cleaned.match(/[\d.]+/);
-    return match ? parseFloat(match[0]) : 0;
+    return match ? parseFloat(match[0]) : undefined;
   }
 
   private parseArea(value?: string | number | null): number | undefined {

@@ -1,6 +1,7 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { Fragment } from "react";
+import { Circle, MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -9,11 +10,12 @@ interface MapProperty {
   title: string;
   price: number;
   currency: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number | null;
+  longitude?: number | null;
   city?: string | null;
   listingType: string;
   url: string;
+  rawPayload?: unknown;
 }
 
 interface MapViewProps {
@@ -32,6 +34,13 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41],
 });
 
+const approximateIcon = L.divIcon({
+  className: "",
+  html: `<div style="width:18px;height:18px;border-radius:50%;background:#f59e0b;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,0.45);"></div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
 L.Marker.prototype.options.icon = defaultIcon;
 
 function formatPrice(price: number, currency: string) {
@@ -42,15 +51,42 @@ function formatPrice(price: number, currency: string) {
   }).format(price);
 }
 
-export function MapView({ properties, center = [48.8566, 2.3522], zoom = 5 }: MapViewProps) {
-  const validProperties = properties.filter(
-    (p) => p.latitude != null && p.longitude != null
+function getLocationMeta(rawPayload: unknown) {
+  const payload = rawPayload as Record<string, unknown> | undefined;
+  const isApproximate =
+    payload?.isApproximateLocation === true ||
+    payload?.locationPrecision === "approximate";
+  const radius = Number(payload?.locationRadiusMeters);
+
+  return {
+    isApproximate,
+    radiusMeters: Number.isFinite(radius) && radius > 0 ? radius : 650,
+  };
+}
+
+function hasValidCoordinates(property: MapProperty): property is MapProperty & { latitude: number; longitude: number } {
+  return (
+    typeof property.latitude === "number" &&
+    typeof property.longitude === "number" &&
+    Number.isFinite(property.latitude) &&
+    Number.isFinite(property.longitude)
   );
+}
+
+export function MapView({ properties, center, zoom = 5 }: MapViewProps) {
+  const validProperties = properties.filter(hasValidCoordinates);
 
   if (validProperties.length === 0) {
     return (
       <div className="flex h-[500px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-        <p className="text-gray-500">No properties with location data</p>
+        <div className="px-6 text-center">
+          <p className="font-medium text-gray-700 dark:text-gray-300">No properties with location data</p>
+          {properties.length > 0 && (
+            <p className="mt-1 text-sm text-gray-500">
+              Save or update listings again so Prop Atlas can geocode their Idealista location text.
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -70,10 +106,11 @@ export function MapView({ properties, center = [48.8566, 2.3522], zoom = 5 }: Ma
     }
   );
 
-  const mapCenter: [number, number] = [
+  const computedCenter: [number, number] = [
     (bounds.minLat + bounds.maxLat) / 2,
     (bounds.minLng + bounds.maxLng) / 2,
   ];
+  const mapCenter = center ?? computedCenter;
 
   return (
     <div className="h-[500px] w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
@@ -87,33 +124,56 @@ export function MapView({ properties, center = [48.8566, 2.3522], zoom = 5 }: Ma
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {validProperties.map((property) => (
-          <Marker
-            key={property.id}
-            position={[property.latitude, property.longitude]}
-          >
-            <Popup>
-              <div className="min-w-[150px]">
-                <p className="text-sm font-medium line-clamp-1">{property.title}</p>
-                <p className="text-sm font-semibold">
-                  {formatPrice(property.price, property.currency)}
-                  {property.listingType === "rent" && "/mo"}
-                </p>
-                {property.city && (
-                  <p className="text-xs text-gray-500">{property.city}</p>
-                )}
-                <a
-                  href={property.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-block text-xs text-blue-600 hover:underline"
-                >
-                  View listing
-                </a>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {validProperties.map((property) => {
+          const locationMeta = getLocationMeta(property.rawPayload);
+          const position: [number, number] = [property.latitude, property.longitude];
+
+          return (
+            <Fragment key={property.id}>
+              {locationMeta.isApproximate && (
+                <Circle
+                  center={position}
+                  radius={locationMeta.radiusMeters}
+                  pathOptions={{
+                    color: "#d97706",
+                    fillColor: "#f59e0b",
+                    fillOpacity: 0.18,
+                    opacity: 0.75,
+                    weight: 2,
+                  }}
+                />
+              )}
+              <Marker
+                position={position}
+                icon={locationMeta.isApproximate ? approximateIcon : defaultIcon}
+              >
+                <Popup>
+                  <div className="min-w-[150px]">
+                    <p className="text-sm font-medium line-clamp-1">{property.title}</p>
+                    <p className="text-sm font-semibold">
+                      {formatPrice(property.price, property.currency)}
+                      {property.listingType === "rent" && "/mo"}
+                    </p>
+                    {locationMeta.isApproximate && (
+                      <p className="mt-1 text-xs font-medium text-amber-700">Approximate area</p>
+                    )}
+                    {property.city && (
+                      <p className="text-xs text-gray-500">{property.city}</p>
+                    )}
+                    <a
+                      href={property.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+                    >
+                      View listing
+                    </a>
+                  </div>
+                </Popup>
+              </Marker>
+            </Fragment>
+          );
+        })}
       </MapContainer>
     </div>
   );

@@ -107,6 +107,24 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
     }
   };
 
+  const handlePermanentDelete = async () => {
+    if (deleteLoading) return;
+    if (!confirm("Are you sure you want to permanently delete this property? This cannot be undone.")) {
+      return;
+    }
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/properties/${property.id}/delete`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        onRemove?.(property.id);
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const formatPrice = (price: number, currency: string) => {
     return new Intl.NumberFormat("en-EU", {
       style: "currency",
@@ -152,13 +170,13 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
   const mainImage = property.images[0] || "/placeholder-property.svg";
 
   return (
-    <div className={`group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 ${showDeleted ? "opacity-60 grayscale" : ""}`}>
+    <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
         <img
           src={mainImage}
           alt={property.title}
           loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105"
+          className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 ${showDeleted ? "grayscale opacity-60" : ""}`}
         />
         <div className="absolute right-2 top-2 flex gap-2">
           <button
@@ -277,6 +295,16 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
         >
           View on {property.provider}
         </a>
+
+        {showDeleted && (
+          <button
+            onClick={handlePermanentDelete}
+            disabled={deleteLoading}
+            className="mt-2 w-full rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+          >
+            Delete permanently
+          </button>
+        )}
       </div>
     </div>
   );

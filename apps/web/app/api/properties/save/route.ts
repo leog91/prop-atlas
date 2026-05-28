@@ -37,6 +37,91 @@ function parseListedDate(value?: string): Date | null {
   return null;
 }
 
+function getRawPayload(data: unknown): Record<string, unknown> {
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+}
+
+function stripLocationLabel(value: string) {
+  return value.replace(/^(urb\.?|barrio|distrito|área|area)\s+/i, "").trim();
+}
+
+function getAddressParts(address?: string) {
+  return (address || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function inferCity(addressParts: string[], city?: string) {
+  if (city) return city;
+  const ignored = /^(urb\.?|barrio|distrito|área|area)\b/i;
+  const inferred = [...addressParts].reverse().find((part) => {
+    return !ignored.test(part) && !/^\d{4,5}$/.test(part);
+  });
+
+  return inferred ? stripLocationLabel(inferred) : undefined;
+}
+
+function getAddressGeocodeQueries(address?: string, city?: string, country?: string) {
+  const parts = getAddressParts(address);
+  const inferredCity = inferCity(parts, city);
+  const postalCode = parts.find((part) => /^\d{4,5}$/.test(part));
+  const street = parts[0];
+  const urbanization = parts.find((part) => /^urb\.?\b/i.test(part));
+  const neighborhood = parts.find((part) => /^barrio\b/i.test(part));
+  const district = parts.find((part) => /^distrito\b/i.test(part));
+  const cleanedArea = parts.find((part) => /^(área|area)\b/i.test(part));
+
+  return [
+    [street, postalCode, inferredCity, country],
+    [street, inferredCity, country],
+    [stripLocationLabel(urbanization || ""), inferredCity, country],
+    [stripLocationLabel(neighborhood || ""), inferredCity, country],
+    [stripLocationLabel(district || ""), inferredCity, country],
+    [stripLocationLabel(cleanedArea || ""), country],
+    [address, city, country],
+    [inferredCity, country],
+  ].map((queryParts) => queryParts.filter(Boolean).join(", "));
+}
+
+function getGeocodeQueries(data: {
+  address?: string;
+  city?: string;
+  country?: string;
+  rawPayload?: Record<string, unknown>;
+}) {
+  const rawQueries = data.rawPayload?.geocodeQueries;
+  const payloadQueries = Array.isArray(rawQueries)
+    ? rawQueries.filter((query): query is string => typeof query === "string" && query.trim().length > 0)
+    : [];
+  const fallbackQueries = getAddressGeocodeQueries(data.address, data.city, data.country);
+
+  return Array.from(new Set([...payloadQueries, ...fallbackQueries].filter((query) => query.trim().length > 0)));
+}
+
+async function geocodeQuery(query: string): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "PropAtlas/1.0",
+      },
+    });
+    if (!response.ok) return null;
+    const results = await response.json();
+    if (results.length > 0) {
+      return {
+        latitude: parseFloat(results[0].lat),
+        longitude: parseFloat(results[0].lon),
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("[GEOCODE] Error:", error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   const { session, error } = await requireAuth(request);
@@ -60,6 +145,44 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
   const db = getDb();
+  const incomingRawPayload = getRawPayload(data.rawPayload);
+  const incomingApproximate =
+    incomingRawPayload.isApproximateLocation === true ||
+    incomingRawPayload.locationPrecision === "approximate";
+
+  let latitude = data.latitude ?? null;
+  let longitude = data.longitude ?? null;
+  let isApproximateLocation = incomingApproximate;
+  let geocodeQueryUsed: string | undefined;
+
+  if (latitude == null || longitude == null) {
+    console.log("[GEOCODE] No coordinates found, attempting geocoding...");
+    console.log("[GEOCODE] Address:", data.address, "City:", data.city, "Country:", data.country);
+    for (const query of getGeocodeQueries({ ...data, rawPayload: incomingRawPayload })) {
+      console.log("[GEOCODE] Trying:", query);
+      const geocoded = await geocodeQuery(query);
+      if (geocoded) {
+        latitude = geocoded.latitude;
+        longitude = geocoded.longitude;
+        isApproximateLocation = true;
+        geocodeQueryUsed = query;
+        console.log("[GEOCODE] ✓ Success:", { query, ...geocoded });
+        break;
+      }
+    }
+    if (latitude == null || longitude == null) {
+      console.log("[GEOCODE] ✗ Failed to geocode");
+    }
+  } else {
+    console.log("[GEOCODE] Using provided coordinates:", { latitude, longitude });
+  }
+
+  const rawPayload = {
+    ...incomingRawPayload,
+    isApproximateLocation,
+    locationPrecision: isApproximateLocation ? "approximate" : incomingRawPayload.locationPrecision,
+    geocodeQueryUsed,
+  };
 
   const existing = await db
     .select()
@@ -103,12 +226,12 @@ export async function POST(request: NextRequest) {
         city: data.city ?? null,
         country: data.country ?? null,
         postalCode: data.postalCode ?? null,
-        latitude: data.latitude ?? null,
-        longitude: data.longitude ?? null,
+        latitude,
+        longitude,
         url: data.url,
         listedAt: parseListedDate(data.listedAt),
         views: data.views ?? null,
-        rawPayload: data.rawPayload ?? null,
+        rawPayload,
         updatedAt: new Date(),
       })
       .where(eq(properties.id, propertyId));
@@ -145,12 +268,12 @@ export async function POST(request: NextRequest) {
       city: data.city ?? null,
       country: data.country ?? null,
       postalCode: data.postalCode ?? null,
-      latitude: data.latitude ?? null,
-      longitude: data.longitude ?? null,
+      latitude,
+      longitude,
       url: data.url,
       listedAt: parseListedDate(data.listedAt),
       views: data.views ?? null,
-      rawPayload: data.rawPayload ?? null,
+      rawPayload,
     });
 
     if (data.images?.length) {

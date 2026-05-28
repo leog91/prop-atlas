@@ -32,6 +32,7 @@ interface Property {
   url: string;
   latitude?: number | null;
   longitude?: number | null;
+  rawPayload?: unknown;
 }
 
 interface DashboardContentProps {
@@ -90,11 +91,12 @@ export function DashboardContent({ properties, showDeleted }: DashboardContentPr
             title: p.title,
             price: p.price,
             currency: p.currency,
-            latitude: p.latitude ?? 0,
-            longitude: p.longitude ?? 0,
+            latitude: p.latitude,
+            longitude: p.longitude,
             city: p.city,
             listingType: p.listingType,
             url: p.url,
+            rawPayload: p.rawPayload,
           }))}
         />
       )}
