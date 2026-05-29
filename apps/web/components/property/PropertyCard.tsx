@@ -68,6 +68,8 @@ interface PropertyCardProps {
     updatedAt?: Date | string | null;
     savedAt?: Date | string | null;
     savedUpdatedAt?: Date | string | null;
+    expenses?: number | null;
+    expensesCurrency?: string | null;
   };
   onToggleFavorite?: (id: string) => void;
   showDeleted?: boolean;
@@ -260,6 +262,12 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
             </>
           )}
         </p>
+
+        {property.expenses != null && property.expenses > 0 && (
+          <p className="mt-0.5 text-xs text-gray-500">
+            Expenses {formatPrice(property.expenses, property.expensesCurrency || "ARS")}/mo
+          </p>
+        )}
 
         {(property.city || property.country) && (
           <p className="mt-1 text-sm text-gray-500">

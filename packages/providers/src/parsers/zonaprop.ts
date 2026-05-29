@@ -28,11 +28,12 @@ export class ZonapropParser implements ProviderParser {
       return null;
     }
 
-    const listingType = this.detectListingType(document.URL, document);
+    const pageText = (document.body as any)?.innerText ?? document.body?.textContent ?? "";
+    const listingType = this.detectListingType(document.URL, pageText);
     const price = jsonLd?.price ?? meta.price ?? dom.price;
     const currency = jsonLd?.currency ?? meta.currency ?? dom.currency ?? "ARS";
-
-    console.log("[ZONAPROP] resolved price:", price, "currency:", currency, "listingType:", listingType);
+    const expenses = jsonLd?.expenses ?? dom.expenses;
+    const expensesCurrency = jsonLd?.expensesCurrency ?? dom.expensesCurrency;
 
     return {
       provider: Provider.ZONAPROP,
@@ -42,6 +43,8 @@ export class ZonapropParser implements ProviderParser {
       description: jsonLd?.description ?? dom.description,
       price,
       currency,
+      expenses,
+      expensesCurrency,
       propertyType: this.mapPropertyType(jsonLd?.propertyType ?? dom.propertyType),
       bedrooms: jsonLd?.bedrooms ?? dom.bedrooms,
       bathrooms: jsonLd?.bathrooms ?? dom.bathrooms,
@@ -54,7 +57,7 @@ export class ZonapropParser implements ProviderParser {
       longitude: jsonLd?.longitude ?? meta.longitude,
       images: jsonLd?.images ?? meta.images ?? dom.images ?? [],
       url: document.URL,
-      rawPayload: { jsonLd, meta, dom },
+      rawPayload: { jsonLd, meta, dom, locationLine: dom.locationLine },
     };
   }
 
@@ -113,10 +116,24 @@ export class ZonapropParser implements ProviderParser {
     // --- Price: innerText preserves spaces between elements, so it's better for
     //     patterns split across tags (e.g. <span>USD</span> <span>59.000</span>).
     const pageText = (document.body as any)?.innerText ?? document.body?.textContent ?? "";
-    console.log("[ZONAPROP] pageText length:", pageText.length, "first 500 chars:", pageText.slice(0, 500));
+    console.log("[ZONAPROP] pageText length:", pageText.length, "first 800 chars:", pageText.slice(0, 800));
     const priceText = this.findPriceLikeText(pageText);
     console.log("[ZONAPROP] priceText:", priceText);
+
+    // --- Expenses (expensas): look for "Expensas" followed by a price-like pattern ---
+    const expensesMatch = pageText.match(/Expensas\s*[:\-]?\s*(.+?)(?:\n|$)/i);
+    console.log("[ZONAPROP] expenses raw match:", expensesMatch?.[1] ?? null);
+    const expensesText = expensesMatch?.[1] ? this.findPriceLikeText(expensesMatch[1]) : undefined;
+    console.log("[ZONAPROP] expensesText:", expensesText);
     const currencyText = priceText ?? pageText;
+
+    // --- Location: Zonaprop shows the address line right after pricing.
+    //     Don't trust the DOM city selector — it often returns the big
+    //     municipality ("Quilmes") instead of the actual neighborhood ("Bernal").
+    const locationLine = this.findLocationLine(pageText);
+    console.log("[ZONAPROP] locationLine:", locationLine);
+    const { address, city } = this.parseZonapropLocation(locationLine);
+    console.log("[ZONAPROP] parsed address:", address, "city:", city);
 
     // --- Area: scan all text for "46m²" patterns ---
     let areaText: string | undefined;
@@ -137,28 +154,107 @@ export class ZonapropParser implements ProviderParser {
       description: text("[class*='description']"),
       price: this.parsePrice(priceText),
       currency: this.parseCurrency(currencyText),
+      expenses: this.parsePrice(expensesText),
+      expensesCurrency: this.parseCurrency(expensesText) ?? this.parseCurrency(expensesMatch?.[1] ?? ""),
       bedrooms: this.extractBedrooms(text("[class*='room']") || text("[class*='bed']")),
       bathrooms: this.extractBathrooms(text("[class*='bath']")),
       area: this.parseArea(text("[class*='area']") || text("[class*='surface']") || areaText),
       propertyType: text("[class*='type']"),
-      address: text('[data-testid="address"]') || text("[class*='address']"),
-      city: text("[class*='location']"),
+      address,
+      city,
+      locationLine,
       listingId: document.querySelector('[data-listing-id]')?.getAttribute("data-listing-id"),
       images,
     };
   }
 
-  private detectListingType(url: string, document?: Document): ListingType {
+  private findLocationLine(pageText: string): string | undefined {
+    const lines = pageText.split("\n").map((l) => l.trim()).filter(Boolean);
+    let passedPrice = false;
+    for (const line of lines) {
+      // Skip until we see the price line
+      if (!passedPrice) {
+        if (this.findPriceLikeText(line)) passedPrice = true;
+        continue;
+      }
+      // Skip known non-location patterns
+      if (/^avisarme si baja/i.test(line)) continue;
+      if (/^publicidad$/i.test(line)) continue;
+      if (/^garantías/i.test(line)) continue;
+      if (/^solicitá/i.test(line)) continue;
+      if (/^100\s*%/i.test(line)) continue;
+      if (/^contactar/i.test(line)) continue;
+      if (/^ver teléfono/i.test(line)) continue;
+      if (/^acepto/i.test(line)) continue;
+      if (/^términos/i.test(line)) continue;
+      if (/^política/i.test(line)) continue;
+      if (/^compartir$/i.test(line)) continue;
+      if (/^notas personales/i.test(line)) continue;
+      if (/^ocultar aviso/i.test(line)) continue;
+      if (/^favorito$/i.test(line)) continue;
+      if (/^ver todas las fotos/i.test(line)) continue;
+      if (/^departamento\s*·/i.test(line)) continue;
+      if (/^local comercial\s*·/i.test(line)) continue;
+      if (/^casa\s*·/i.test(line)) continue;
+      if (/^oficina\s*·/i.test(line)) continue;
+      if (/^ph\s*·/i.test(line)) continue;
+      if (/^terreno\s*·/i.test(line)) continue;
+      // Area specs start with numbers + units
+      if (/^\d+\s*m²/i.test(line)) continue;
+      if (/^\d+\s*(tot\.|cub\.|amb\.|baño|dorm\.)/i.test(line)) continue;
+      // Location line must contain a comma and look like an address
+      if (line.includes(",") && /[a-záéíóúñ]/i.test(line) && line.length > 10 && line.length < 120) {
+        return line;
+      }
+    }
+    return undefined;
+  }
+
+  private parseZonapropLocation(locationText?: string): { address?: string; city?: string } {
+    if (!locationText) return {};
+    // Zonaprop format: "Street Number, Neighborhood, Municipality" or "Street Number, City, Province, Country"
+    // e.g. "Belgrano al 300, Bernal Este, Quilmes" (street, neighborhood, parent municipality)
+    //      "Alvear 709, Quilmes, Buenos Aires, Argentina., Quilmes, Quilmes"
+    let parts = locationText.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 0) return {};
+    if (parts.length === 1) return { city: parts[0] };
+
+    // First part is usually the street address
+    const address = parts[0];
+
+    // Strip trailing country/province and generic prefixes
+    parts = parts.slice(1); // remove address
+    parts = parts.filter((p) => !/^argentina\.?$/i.test(p));
+    parts = parts.filter((p) => !/^buenos aires$/i.test(p));
+    parts = parts.filter((p) => !/^provincia de buenos aires$/i.test(p));
+    parts = parts.map((p) => p.replace(/^barrio\s+/i, "").trim());
+    // Remove exact duplicates that appear consecutively
+    parts = parts.filter((p, i) => i === 0 || p.toLowerCase() !== parts[i - 1].toLowerCase());
+
+    if (parts.length === 0) return { address };
+
+    // Heuristic: for Argentina, the most useful city for geocoding is the
+    // *most specific* place before the parent municipality.
+    // "Belgrano al 300, Bernal Este, Quilmes" → "Bernal Este" (not "Quilmes")
+    // "Alvear 709, Quilmes" → "Quilmes"
+    // Prefer the second-to-last remaining part when there are 2+ parts,
+    // because the last part is often the broad municipality.
+    const city = parts.length >= 2 ? parts[parts.length - 2] : parts[parts.length - 1];
+
+    return { address, city: city || undefined };
+  }
+
+  private detectListingType(url: string, pageText?: string): ListingType {
     if (url.includes("/alquiler") || url.includes("/rent")) return ListingType.RENT;
     if (url.includes("/venta") || url.includes("/sale")) return ListingType.BUY;
     // URLs like /propiedades/clasificado/... don't indicate operation type;
-    // fall back to scanning the page text.
-    // Note: "Alquilar" appears in the nav menu of every page, so we can't use
-    // simple indexOf. We look for "venta" in the actual listing content.
-    if (document) {
-      const bodyText = document.body?.textContent?.toLowerCase() ?? "";
-      if (bodyText.includes("venta")) return ListingType.BUY;
-      if (bodyText.includes("alquiler")) return ListingType.RENT;
+    // Scan the rendered page text (innerText) but only the first ~2000 chars
+    // where the listing header lives. Footers and related listings further down
+    // can contain "venta" and cause false positives.
+    if (pageText) {
+      const window = pageText.slice(0, 2000);
+      if (/\bAlquiler\b/.test(window)) return ListingType.RENT;
+      if (/\bVenta\b/.test(window)) return ListingType.BUY;
     }
     return ListingType.RENT;
   }

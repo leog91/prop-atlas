@@ -147,9 +147,36 @@ function getGeocodeQueries(data: {
   const payloadQueries = Array.isArray(rawQueries)
     ? rawQueries.filter((query): query is string => typeof query === "string" && query.trim().length > 0)
     : [];
-  const fallbackQueries = getAddressGeocodeQueries(data.address, data.city, data.country);
 
-  return Array.from(new Set([...payloadQueries, ...fallbackQueries].filter((query) => query.trim().length > 0)));
+  const firstQueries: string[] = [];
+  const fallbackQueries: string[] = [];
+
+  // 1. Try the full raw location line FIRST (exactly as Zonaprop shows it)
+  const rawLoc = data.rawPayload?.locationLine;
+  if (typeof rawLoc === "string" && rawLoc.trim().length > 0) {
+    const loc = rawLoc.trim();
+    const country = data.country || "";
+    firstQueries.push(`${loc}, ${country}`.trim().replace(/,$/, ""));
+    if (data.country?.toLowerCase() === "argentina") {
+      firstQueries.push(`${loc}, Buenos Aires, Argentina`);
+      firstQueries.push(`${loc}, Provincia de Buenos Aires, Argentina`);
+    }
+  }
+
+  // 2. Fallback: split address/city permutations
+  fallbackQueries.push(...getAddressGeocodeQueries(data.address, data.city, data.country));
+
+  // 3. Argentina-specific province hints
+  if (data.country?.toLowerCase() === "argentina" && data.city) {
+    if (data.address) {
+      fallbackQueries.push(`${data.address}, ${data.city}, Buenos Aires, Argentina`);
+      fallbackQueries.push(`${data.address}, ${data.city}, Provincia de Buenos Aires, Argentina`);
+    }
+    fallbackQueries.push(`${data.city}, Buenos Aires, Argentina`);
+    fallbackQueries.push(`${data.city}, Provincia de Buenos Aires, Argentina`);
+  }
+
+  return Array.from(new Set([...payloadQueries, ...firstQueries, ...fallbackQueries].filter((query) => query.trim().length > 0)));
 }
 
 async function geocodeQuery(query: string): Promise<{ latitude: number; longitude: number } | null> {
@@ -280,6 +307,8 @@ export async function POST(request: NextRequest) {
         description: data.description ?? null,
         price,
         currency: data.currency,
+        expenses: data.expenses ?? null,
+        expensesCurrency: data.expensesCurrency ?? null,
         propertyType: data.propertyType,
         bedrooms: data.bedrooms ?? null,
         bathrooms: data.bathrooms ?? null,
@@ -322,6 +351,8 @@ export async function POST(request: NextRequest) {
       description: data.description ?? null,
       price,
       currency: data.currency,
+      expenses: data.expenses ?? null,
+      expensesCurrency: data.expensesCurrency ?? null,
       propertyType: data.propertyType,
       bedrooms: data.bedrooms ?? null,
       bathrooms: data.bathrooms ?? null,

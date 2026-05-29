@@ -41,6 +41,8 @@ export const propertySchema = z.object({
   description: z.string().optional(),
   price: z.number().nonnegative().optional(),
   currency: z.string().length(3).default("EUR"),
+  expenses: z.number().nonnegative().nullish(),
+  expensesCurrency: z.string().nullish(),
   propertyType: z.enum([
     PropertyType.APARTMENT,
     PropertyType.HOUSE,

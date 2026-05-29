@@ -29,6 +29,8 @@ export const properties = sqliteTable(
     description: text("description"),
     price: real("price").notNull(),
     currency: text("currency").notNull().default("EUR"),
+    expenses: real("expenses"),
+    expensesCurrency: text("expenses_currency"),
     propertyType: text("property_type").notNull(),
     bedrooms: integer("bedrooms"),
     bathrooms: integer("bathrooms"),
