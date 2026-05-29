@@ -249,9 +249,15 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
         </div>
 
         <p className="mt-1 text-lg font-semibold">
-          {formatPrice(property.price, property.currency)}
-          {property.listingType === "rent" && (
-            <span className="text-sm font-normal text-gray-500">/mo</span>
+          {property.price === 0 ? (
+            <span className="text-base font-normal text-gray-500">Contact for price</span>
+          ) : (
+            <>
+              {formatPrice(property.price, property.currency)}
+              {property.listingType === "rent" && (
+                <span className="text-sm font-normal text-gray-500">/mo</span>
+              )}
+            </>
           )}
         </p>
 

@@ -29,7 +29,7 @@ export class KamernetParser implements ProviderParser {
       listingType: ListingType.RENT,
       title: nextData?.title ?? jsonLd?.name ?? meta.title ?? dom.title ?? "",
       description: nextData?.description ?? jsonLd?.description ?? dom.description,
-      price: nextData?.price ?? jsonLd?.price ?? meta.price ?? dom.price ?? 0,
+      price: nextData?.price ?? jsonLd?.price ?? meta.price ?? dom.price,
       currency: "EUR",
       propertyType: nextData?.propertyType ?? this.mapPropertyType(jsonLd?.propertyType ?? dom.propertyType),
       bedrooms: jsonLd?.bedrooms ?? dom.bedrooms,

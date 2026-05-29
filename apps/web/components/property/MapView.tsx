@@ -151,8 +151,14 @@ export function MapView({ properties, center, zoom = 5 }: MapViewProps) {
                   <div className="min-w-[150px]">
                     <p className="text-sm font-medium line-clamp-1">{property.title}</p>
                     <p className="text-sm font-semibold">
-                      {formatPrice(property.price, property.currency)}
-                      {property.listingType === "rent" && "/mo"}
+                      {property.price === 0 ? (
+                        <span className="text-xs font-normal text-gray-500">Contact for price</span>
+                      ) : (
+                        <>
+                          {formatPrice(property.price, property.currency)}
+                          {property.listingType === "rent" && "/mo"}
+                        </>
+                      )}
                     </p>
                     {locationMeta.isApproximate && (
                       <p className="mt-1 text-xs font-medium text-amber-700">Approximate area</p>

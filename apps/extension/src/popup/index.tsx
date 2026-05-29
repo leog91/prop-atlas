@@ -29,14 +29,19 @@ function IndexPopup() {
   const handleSave = async () => {
     setErrorMsg("");
     setStatus("detecting");
+    console.log("[EXT POPUP] handleSave started");
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      console.log("[EXT POPUP] active tab:", tab?.url);
       if (!tab?.id) throw new Error("No active tab");
 
       let results;
       try {
+        console.log("[EXT POPUP] sending PARSE_LISTING to tab", tab.id);
         results = await chrome.tabs.sendMessage(tab.id, { type: "PARSE_LISTING" });
-      } catch {
+        console.log("[EXT POPUP] results from content script:", JSON.stringify(results, null, 2));
+      } catch (e) {
+        console.error("[EXT POPUP] sendMessage failed:", e);
         throw new Error("Content script not loaded. Refresh the page and try again.");
       }
 
@@ -72,6 +77,7 @@ function IndexPopup() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
+        console.log("[EXT POPUP] server error response:", JSON.stringify(data, null, 2));
         if (data?.details?.fieldErrors) {
           const errors = Object.entries(data.details.fieldErrors)
             .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)

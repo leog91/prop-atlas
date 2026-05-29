@@ -22,7 +22,7 @@ export class DaftParser implements ProviderParser {
     if (!providerListingId) return null;
 
     const listingType = this.detectListingType(document.URL, meta);
-    const price = jsonLd?.price || meta.price || dom.price || 0;
+    const price = jsonLd?.price || meta.price || dom.price;
     const title = jsonLd?.name || meta.title || dom.title || "";
     const images = (jsonLd?.images?.length ? jsonLd.images : null) || 
                    (meta.images?.length ? meta.images : null) || 

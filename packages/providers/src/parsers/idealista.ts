@@ -22,7 +22,7 @@ export class IdealistaParser implements ProviderParser {
     if (!providerListingId) return null;
 
     const listingType = this.detectListingType(document.URL);
-    const price = jsonLd?.price ?? meta.price ?? dom.price ?? 0;
+    const price = jsonLd?.price ?? meta.price ?? dom.price;
     const title = jsonLd?.name ?? meta.title ?? dom.title ?? "";
     const images = jsonLd?.images ?? meta.images ?? dom.images ?? [];
     const country = this.detectCountry(document.URL);

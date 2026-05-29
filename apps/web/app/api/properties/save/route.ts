@@ -33,7 +33,7 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
-function parseListedDate(value?: string): Date | null {
+function parseListedDate(value?: string | null): Date | null {
   if (!value) return null;
   const d = new Date(value);
   if (!isNaN(d.getTime())) return d;
@@ -175,7 +175,8 @@ async function geocodeQuery(query: string): Promise<{ latitude: number; longitud
   }
 }
 
-function normalizeIncomingPrice(data: { provider: string; price: number }) {
+function normalizeIncomingPrice(data: { provider: string; price?: number }) {
+  if (data.price == null) return undefined;
   if (data.provider === "idealista" && data.price > 0 && data.price < 100 && !Number.isInteger(data.price)) {
     return Math.round(data.price * 1000);
   }
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
   const db = getDb();
-  const price = normalizeIncomingPrice(data);
+  const price = normalizeIncomingPrice(data) ?? 0;
   const incomingRawPayload = getRawPayload(data.rawPayload);
   const incomingApproximate =
     incomingRawPayload.isApproximateLocation === true ||
