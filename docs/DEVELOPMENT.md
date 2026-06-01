@@ -27,6 +27,21 @@ bun run typecheck # Type-check all
 5. Update `apps/web/next.config.ts` image domains
 6. Rebuild and test
 
+## Using Page Snapshots for Parser Development
+
+When a site changes its HTML structure and the parser breaks:
+
+1. Open the extension popup on the listing page
+2. Click **"Analyze Structure"** — this captures a semantic HTML map (meta tags, JSON-LD, key DOM nodes, and page text)
+3. The snapshot is saved to the backend and appears at `/snapshots`
+4. In the Snapshots page, expand the entry to inspect:
+   - **Meta Tags** — Open Graph, Twitter, product metadata
+   - **JSON-LD** — structured data schemas
+   - **DOM Nodes** — tag, text, class, data-* attributes
+   - **Page Text** — first 6,000 chars of `innerText` for regex analysis
+5. Copy the JSON and feed it to an LLM to generate or fix parser code
+6. Update the parser in `packages/providers/src/parsers/` and rebuild
+
 ## Database Changes
 
 1. Update schema in `packages/db/src/schema/index.ts`

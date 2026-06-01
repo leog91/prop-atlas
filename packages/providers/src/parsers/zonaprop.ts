@@ -35,6 +35,10 @@ export class ZonapropParser implements ProviderParser {
     const expenses = jsonLd?.expenses ?? dom.expenses;
     const expensesCurrency = jsonLd?.expensesCurrency ?? dom.expensesCurrency;
 
+    // Prefer numberOfBedrooms over numberOfRooms from JSON-LD
+    const bedrooms = jsonLd?.numberOfBedrooms ?? jsonLd?.bedrooms ?? dom.bedrooms;
+    const bathrooms = jsonLd?.numberOfBathroomsTotal ?? jsonLd?.bathrooms ?? dom.bathrooms;
+
     return {
       provider: Provider.ZONAPROP,
       providerListingId,
@@ -46,8 +50,8 @@ export class ZonapropParser implements ProviderParser {
       expenses,
       expensesCurrency,
       propertyType: this.mapPropertyType(jsonLd?.propertyType ?? dom.propertyType),
-      bedrooms: jsonLd?.bedrooms ?? dom.bedrooms,
-      bathrooms: jsonLd?.bathrooms ?? dom.bathrooms,
+      bedrooms,
+      bathrooms,
       area: jsonLd?.area ?? dom.area,
       areaUnit: "m²",
       address: jsonLd?.address ?? dom.address,
@@ -57,6 +61,11 @@ export class ZonapropParser implements ProviderParser {
       longitude: jsonLd?.longitude ?? meta.longitude,
       images: jsonLd?.images ?? meta.images ?? dom.images ?? [],
       url: document.URL,
+      listedAt: dom.listedAt,
+      floor: dom.floor,
+      hasElevator: dom.hasElevator,
+      hasParking: dom.hasParking,
+      isFurnished: dom.isFurnished,
       rawPayload: { jsonLd, meta, dom, locationLine: dom.locationLine },
     };
   }
@@ -66,22 +75,30 @@ export class ZonapropParser implements ProviderParser {
     for (const script of scripts) {
       try {
         const data = JSON.parse(script.textContent || "");
-        if (data["@type"] === "Residence" || data["@type"] === "RealEstateListing" || data["@type"] === "Place") {
-          const offer = data.offers || data;
+        const types = Array.isArray(data) ? data.map((d) => d["@type"]) : [data["@type"]];
+        if (
+          types.some((t) =>
+            ["Residence", "RealEstateListing", "Place", "Apartment", "House", "Studio"].includes(t)
+          )
+        ) {
+          const item = Array.isArray(data) ? data.find((d) => !["BreadcrumbList", "WebSite", "Organization"].includes(d["@type"])) : data;
+          if (!item) continue;
           return {
-            name: data.name,
-            description: data.description,
-            price: this.parsePrice(offer.price),
-            currency: this.parseCurrency(offer.priceCurrency),
-            propertyType: data.accommodationType ?? data.propertyType,
-            bedrooms: data.numberOfRooms,
-            bathrooms: data.numberOfBathroomsTotal,
-            area: this.parseArea(data.floorSize?.value),
-            address: this.formatAddress(data.address),
-            latitude: data.geo?.latitude,
-            longitude: data.geo?.longitude,
-            images: this.normalizeImages(data.image),
-            identifier: data.identifier,
+            name: item.name,
+            description: item.description,
+            price: this.parsePrice(item.price ?? item.offers?.price),
+            currency: this.parseCurrency(item.priceCurrency),
+            propertyType: item.accommodationType ?? item.propertyType ?? item["@type"],
+            bedrooms: item.numberOfRooms,
+            numberOfBedrooms: item.numberOfBedrooms,
+            numberOfBathroomsTotal: item.numberOfBathroomsTotal,
+            bathrooms: item.numberOfBathroomsTotal,
+            area: this.parseArea(item.floorSize?.value),
+            address: this.formatAddress(item.address),
+            latitude: item.geo?.latitude,
+            longitude: item.geo?.longitude,
+            images: this.normalizeImages(item.image),
+            identifier: item.identifier,
           };
         }
       } catch {}
@@ -149,6 +166,15 @@ export class ZonapropParser implements ProviderParser {
       .map((img) => img.getAttribute("src") || img.getAttribute("data-src"))
       .filter((src): src is string => !!src && src.startsWith("http"));
 
+    // Extract floor, elevator, parking, furnished from page text
+    const floorMatch = pageText.match(/(\d+ª?\s*(?:planta|piso))/i);
+    const hasElevator = /(?:ascensor|elevator)/i.test(pageText);
+    const hasParking = /(?:cochera|garaje|estacionamiento|parking)/i.test(pageText);
+    const isFurnished = /(?:amoblado|amueblado|furnished)/i.test(pageText);
+
+    // Listed date
+    const listedAtMatch = pageText.match(/Publicado\s+hace\s+(\d+)\s+(?:día|días|mes|meses)/i);
+
     return {
       title: titleText || "",
       description: text("[class*='description']"),
@@ -163,6 +189,11 @@ export class ZonapropParser implements ProviderParser {
       address,
       city,
       locationLine,
+      floor: floorMatch ? floorMatch[1] : undefined,
+      hasElevator: hasElevator || undefined,
+      hasParking: hasParking || undefined,
+      isFurnished: isFurnished || undefined,
+      listedAt: listedAtMatch ? listedAtMatch[0] : undefined,
       listingId: document.querySelector('[data-listing-id]')?.getAttribute("data-listing-id"),
       images,
     };
@@ -266,6 +297,9 @@ export class ZonapropParser implements ProviderParser {
     if (lower.includes("house") || lower.includes("casa")) return PropertyType.HOUSE;
     if (lower.includes("studio") || lower.includes("monoambiente")) return PropertyType.STUDIO;
     if (lower.includes("room") || lower.includes("habitaci")) return PropertyType.ROOM;
+    if (lower.includes("ph")) return PropertyType.HOUSE;
+    if (lower.includes("terreno") || lower.includes("land")) return PropertyType.LAND;
+    if (lower.includes("local") || lower.includes("comercial")) return PropertyType.COMMERCIAL;
     return PropertyType.OTHER;
   }
 

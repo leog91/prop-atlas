@@ -66,6 +66,12 @@ export const propertySchema = z.object({
   url: z.string().url(),
   listedAt: z.string().nullish(),
   views: z.number().int().nonnegative().nullish(),
+  deposit: z.number().nonnegative().nullish(),
+  depositCurrency: z.string().nullish(),
+  floor: z.string().nullish(),
+  hasElevator: z.boolean().nullish(),
+  hasParking: z.boolean().nullish(),
+  isFurnished: z.boolean().nullish(),
   rawPayload: z.record(z.unknown()).optional(),
 });
 

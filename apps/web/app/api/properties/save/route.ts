@@ -323,6 +323,12 @@ export async function POST(request: NextRequest) {
         url: data.url,
         listedAt: parseListedDate(data.listedAt),
         views: data.views ?? null,
+        deposit: data.deposit ?? null,
+        depositCurrency: data.depositCurrency ?? null,
+        floor: data.floor ?? null,
+        hasElevator: data.hasElevator ?? null,
+        hasParking: data.hasParking ?? null,
+        isFurnished: data.isFurnished ?? null,
         rawPayload,
         updatedAt: new Date(),
       })
@@ -367,6 +373,12 @@ export async function POST(request: NextRequest) {
       url: data.url,
       listedAt: parseListedDate(data.listedAt),
       views: data.views ?? null,
+      deposit: data.deposit ?? null,
+      depositCurrency: data.depositCurrency ?? null,
+      floor: data.floor ?? null,
+      hasElevator: data.hasElevator ?? null,
+      hasParking: data.hasParking ?? null,
+      isFurnished: data.isFurnished ?? null,
       rawPayload,
     });
 

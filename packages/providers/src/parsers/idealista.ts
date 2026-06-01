@@ -55,6 +55,10 @@ export class IdealistaParser implements ProviderParser {
       images,
       url: document.URL,
       listedAt: listingDate?.isoDate,
+      floor: dom.floor,
+      hasElevator: dom.hasElevator,
+      hasParking: dom.hasParking,
+      isFurnished: dom.isFurnished,
       rawPayload: {
         jsonLd,
         meta,
@@ -74,26 +78,27 @@ export class IdealistaParser implements ProviderParser {
     for (const script of scripts) {
       try {
         const data = JSON.parse(script.textContent || "");
+        const types = Array.isArray(data) ? data.map((d) => d["@type"]) : [data["@type"]];
         if (
-          data["@type"] === "Residence" ||
-          data["@type"] === "RealEstateListing" ||
-          data["@type"] === "Apartment" ||
-          data["@type"] === "House" ||
-          data["@type"] === "Place"
+          types.some((t) =>
+            ["Residence", "RealEstateListing", "Place", "Apartment", "House", "Studio"].includes(t)
+          )
         ) {
+          const item = Array.isArray(data) ? data.find((d) => !["BreadcrumbList", "WebSite", "Organization"].includes(d["@type"])) : data;
+          if (!item) continue;
           return {
-            name: data.name,
-            description: data.description,
-            price: this.parsePrice(data.price ?? data.offers?.price),
-            propertyType: data.accommodationType ?? data["@type"],
-            bedrooms: data.numberOfRooms ?? this.extractBedrooms(data.description),
-            bathrooms: data.numberOfBathroomsTotal ?? this.extractBathrooms(data.description),
-            area: this.parseArea(data.floorSize?.value ?? data.livingArea),
-            address: this.formatAddress(data.address),
-            latitude: data.geo?.latitude,
-            longitude: data.geo?.longitude,
-            images: this.normalizeImages(data.image),
-            identifier: data.identifier,
+            name: item.name,
+            description: item.description,
+            price: this.parsePrice(item.price ?? item.offers?.price),
+            propertyType: item.accommodationType ?? item["@type"],
+            bedrooms: item.numberOfRooms ?? this.extractBedrooms(item.description),
+            bathrooms: item.numberOfBathroomsTotal ?? this.extractBathrooms(item.description),
+            area: this.parseArea(item.floorSize?.value ?? item.livingArea),
+            address: this.formatAddress(item.address),
+            latitude: item.geo?.latitude,
+            longitude: item.geo?.longitude,
+            images: this.normalizeImages(item.image),
+            identifier: item.identifier,
           };
         }
       } catch {}
@@ -123,8 +128,9 @@ export class IdealistaParser implements ProviderParser {
       text('[data-testid="price"]') ||
       text(".detail-price") ||
       text("[class*='price']") ||
-      text(".info-data-price");
-    const titleText = text("h1") || text(".detail-title");
+      text(".info-data-price") ||
+      text("span.price");
+    const titleText = text("h1") || text(".detail-title") || text("span.main-info__title-main");
     const descriptionText = text(".detail-description") || text("[class*='description']") || text(".comment");
 
     const imageElements = document.querySelectorAll(
@@ -136,6 +142,13 @@ export class IdealistaParser implements ProviderParser {
 
     const featuresText = document.body.textContent || "";
 
+    // Parse floor, elevator, parking from info-features
+    const infoFeaturesText = text(".info-features") || "";
+    const floorMatch = infoFeaturesText.match(/(\d+ª?\s*(?:planta|piso|floor))/i);
+    const hasElevator = /(?:ascensor|elevator|lift)/i.test(infoFeaturesText);
+    const hasParking = /(?:garaje|parking|plaza\s+de\s+aparcamiento)/i.test(infoFeaturesText);
+    const isFurnished = /(?:amueblado|furnished)/i.test(featuresText);
+
     const location = this.extractLocation(document);
 
     return {
@@ -145,10 +158,14 @@ export class IdealistaParser implements ProviderParser {
       bedrooms: this.extractBedrooms(featuresText) ?? this.extractFromInfoData(document, "rooms"),
       bathrooms: this.extractBathrooms(featuresText) ?? this.extractFromInfoData(document, "bathrooms"),
       area: this.parseArea(text("[class*='area']") || text(".info-data-feature")),
-      propertyType: text("[class*='property-type']") || text(".detail-type"),
+      propertyType: text("[class*='property-type']") || text(".detail-type") || text("strong.typology"),
       address: location.address,
       city: location.city ?? text(".detail-location-city"),
       postalCode: location.postalCode ?? text("[class*='postal-code']"),
+      floor: floorMatch ? floorMatch[1] : undefined,
+      hasElevator: hasElevator || undefined,
+      hasParking: hasParking || undefined,
+      isFurnished: isFurnished || undefined,
       listingId: attr('[data-listing-id]', "data-listing-id") || attr('[data-element-id]', "data-element-id"),
       images,
     };

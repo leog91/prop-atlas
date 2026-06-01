@@ -12,6 +12,12 @@ Extension extracts property data and sends it to the backend API, which stores i
 2. **Backend**: Validates with Zod → authenticates via API key → checks duplicates → stores in Turso
 3. **Frontend**: Dashboard queries saved properties → renders cards and map
 
+## Snapshot Flow (Parser Development)
+
+1. **Extension**: Content script builds a semantic HTML map (meta, JSON-LD, DOM nodes, page text) → sends to `/api/snapshots/save`
+2. **Backend**: Authenticates → stores snapshot JSON in `page_snapshots` table
+3. **Frontend**: `/snapshots` page lists captures → expand to inspect structure → copy JSON for LLM analysis
+
 ## Project Structure
 
 ```

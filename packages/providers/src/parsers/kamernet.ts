@@ -43,6 +43,9 @@ export class KamernetParser implements ProviderParser {
       images: nextData?.images ?? jsonLd?.images ?? meta.images ?? dom.images ?? [],
       url: document.URL,
       listedAt: nextData?.listedAt,
+      deposit: nextData?.deposit ?? dom.deposit,
+      depositCurrency: (nextData?.deposit ?? dom.deposit) ? "EUR" : undefined,
+      isFurnished: nextData?.isFurnished ?? dom.isFurnished,
       rawPayload: { nextData, jsonLd, meta, dom },
     };
   }
@@ -73,6 +76,8 @@ export class KamernetParser implements ProviderParser {
       const latitude = listing.postalCodeLat;
       const longitude = listing.postalCodeLong;
       const listedAt = listing.publishDate;
+      const deposit = listing.deposit;
+      const isFurnished = listing.isFurnished;
 
       return {
         listingId: String(listing.listingId),
@@ -87,6 +92,8 @@ export class KamernetParser implements ProviderParser {
         latitude,
         longitude,
         listedAt,
+        deposit,
+        isFurnished,
       };
     } catch (e) {
       console.error('Failed to parse __NEXT_DATA__:', e);
@@ -110,19 +117,26 @@ export class KamernetParser implements ProviderParser {
     for (const script of scripts) {
       try {
         const data = JSON.parse(script.textContent || "");
-        if (data["@type"] === "Residence" || data["@type"] === "RealEstateListing" || data["@type"] === "Place") {
+        const types = Array.isArray(data) ? data.map((d) => d["@type"]) : [data["@type"]];
+        if (
+          types.some((t) =>
+            ["Residence", "RealEstateListing", "Place", "Apartment", "House", "Studio"].includes(t)
+          )
+        ) {
+          const item = Array.isArray(data) ? data.find((d) => !["BreadcrumbList", "WebSite", "Organization"].includes(d["@type"])) : data;
+          if (!item) continue;
           return {
-            name: data.name,
-            description: data.description,
-            price: this.parsePrice(data.price ?? data.offers?.price),
-            propertyType: data.accommodationType ?? data.propertyType,
-            bedrooms: data.numberOfRooms,
-            area: this.parseArea(data.floorSize?.value),
-            address: this.formatAddress(data.address),
-            latitude: data.geo?.latitude,
-            longitude: data.geo?.longitude,
-            images: this.normalizeImages(data.image),
-            identifier: data.identifier,
+            name: item.name,
+            description: item.description,
+            price: this.parsePrice(item.price ?? item.offers?.price),
+            propertyType: item.accommodationType ?? item.propertyType ?? item["@type"],
+            bedrooms: item.numberOfRooms,
+            area: this.parseArea(item.floorSize?.value),
+            address: this.formatAddress(item.address),
+            latitude: item.geo?.latitude,
+            longitude: item.geo?.longitude,
+            images: this.normalizeImages(item.image),
+            identifier: item.identifier,
           };
         }
       } catch {}
@@ -146,9 +160,28 @@ export class KamernetParser implements ProviderParser {
 
   private extractFromDom(document: Document) {
     const text = (selector: string) => document.querySelector(selector)?.textContent?.trim();
+    const allText = (selector: string) =>
+      Array.from(document.querySelectorAll(selector))
+        .map((el) => el.textContent?.trim())
+        .filter((t): t is string => !!t);
 
-    const priceText = text('[data-testid="price"]') || text("[class*='price']");
-    const titleText = text("h1") || text('[data-testid="title"]');
+    const priceText = text('[data-testid="price"]') || text("[class*='price']") || text(".PropertyDetails_price__xmRFv");
+    const titleText = text("h1") || text('[data-testid="title"]') || text(".Header_root__RO9u9 h3");
+
+    // Try to find deposit from cost breakdown section
+    const depositNodes = allText(".RentalCosts_cardRow__RilZB");
+    let deposit: number | undefined;
+    for (const nodeText of depositNodes) {
+      const match = nodeText.match(/Deposit\s*[€]?([\d.,]+)/i);
+      if (match) {
+        deposit = this.parsePrice(match[1]);
+        break;
+      }
+    }
+
+    // Check furnished status from overview/details
+    const overviewText = text(".Overview_root__CNI03") || "";
+    const isFurnished = /furnished/i.test(overviewText);
 
     const imageElements = document.querySelectorAll('[class*="gallery"] img, [data-testid="gallery"] img');
     const images = Array.from(imageElements)
@@ -160,10 +193,12 @@ export class KamernetParser implements ProviderParser {
       description: text("[class*='description']"),
       price: this.parsePrice(priceText),
       bedrooms: this.extractBedrooms(text("[class*='room']") || text("[class*='bed']")),
-      area: this.parseArea(text("[class*='area']") || text("[class*='size']")),
+      area: this.parseArea(text("[class*='area']") || text("[class*='size']") || text(".PropertyDetails_row___QmRn")),
       propertyType: text("[class*='type']"),
       address: text('[data-testid="address"]') || text("[class*='address']"),
       city: text("[class*='city']"),
+      deposit,
+      isFurnished: isFurnished || undefined,
       listingId: document.querySelector('[data-listing-id]')?.getAttribute("data-listing-id"),
       images,
     };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-type Status = "idle" | "detecting" | "saving" | "saved" | "error";
+type Status = "idle" | "detecting" | "saving" | "saved" | "analyzing" | "analyzed" | "error";
 
 function IndexPopup() {
   const [status, setStatus] = useState<Status>("idle");
@@ -25,6 +25,8 @@ function IndexPopup() {
       setErrorMsg("");
     });
   };
+
+  const apiUrl = process.env.PLASMO_PUBLIC_API_URL || "http://localhost:3000";
 
   const handleSave = async () => {
     setErrorMsg("");
@@ -55,8 +57,6 @@ function IndexPopup() {
 
       setStatus("saving");
 
-      const apiUrl = process.env.PLASMO_PUBLIC_API_URL || "http://localhost:3000";
-      
       let response;
       try {
         response = await fetch(`${apiUrl}/api/properties/save`, {
@@ -94,7 +94,72 @@ function IndexPopup() {
     }
   };
 
-  const apiUrl = process.env.PLASMO_PUBLIC_API_URL || "http://localhost:3000";
+  const handleAnalyze = async () => {
+    setErrorMsg("");
+    setStatus("analyzing");
+    console.log("[EXT POPUP] handleAnalyze started");
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      console.log("[EXT POPUP] active tab:", tab?.url);
+      if (!tab?.id) throw new Error("No active tab");
+
+      let results;
+      try {
+        console.log("[EXT POPUP] sending ANALYZE_STRUCTURE to tab", tab.id);
+        results = await chrome.tabs.sendMessage(tab.id, { type: "ANALYZE_STRUCTURE" });
+        console.log("[EXT POPUP] results from content script:", JSON.stringify(results, null, 2));
+      } catch (e) {
+        console.error("[EXT POPUP] sendMessage failed:", e);
+        throw new Error("Content script not loaded. Refresh the page and try again.");
+      }
+
+      if (results?.error) {
+        throw new Error(results.error);
+      }
+
+      if (!results?.snapshot) {
+        throw new Error("Could not analyze page structure.");
+      }
+
+      const snapshot = results.snapshot;
+      const provider = results.provider || "unknown";
+
+      let response;
+      try {
+        response = await fetch(`${apiUrl}/api/snapshots/save`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            provider,
+            url: snapshot.url,
+            snapshot,
+          }),
+        });
+      } catch (fetchErr) {
+        throw new Error(`Cannot connect to ${apiUrl}. Make sure the app is running.`);
+      }
+
+      if (response.status === 401) {
+        throw new Error("Invalid API key. Check your settings.");
+      }
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        console.log("[EXT POPUP] server error response:", JSON.stringify(data, null, 2));
+        throw new Error(data?.error || `Server error (${response.status})`);
+      }
+
+      const data = await response.json();
+      console.log("[EXT POPUP] snapshot saved:", data.id);
+      setStatus("analyzed");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Unknown error");
+      setStatus("error");
+    }
+  };
 
   if (showSettings) {
     return (
@@ -171,27 +236,47 @@ function IndexPopup() {
       </div>
 
       {status === "idle" && (
-        <button
-          onClick={handleSave}
-          style={{
-            width: "100%",
-            padding: "10px 16px",
-            background: "#2563eb",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-        >
-          Save Property
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button
+            onClick={handleSave}
+            style={{
+              width: "100%",
+              padding: "10px 16px",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 500,
+            }}
+          >
+            Save Property
+          </button>
+          <button
+            onClick={handleAnalyze}
+            style={{
+              width: "100%",
+              padding: "10px 16px",
+              background: "#f3f4f6",
+              color: "#374151",
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+          >
+            Analyze Structure
+          </button>
+        </div>
       )}
 
       {status === "detecting" && <p style={{ color: "#6b7280" }}>Detecting listing...</p>}
       {status === "saving" && <p style={{ color: "#6b7280" }}>Saving...</p>}
       {status === "saved" && <p style={{ color: "#16a34a", fontWeight: 500 }}>Property saved!</p>}
+      {status === "analyzing" && <p style={{ color: "#6b7280" }}>Analyzing structure...</p>}
+      {status === "analyzed" && <p style={{ color: "#16a34a", fontWeight: 500 }}>Structure captured!</p>}
 
       {status === "error" && (
         <>

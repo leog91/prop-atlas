@@ -45,6 +45,12 @@ export const properties = sqliteTable(
     url: text("url").notNull(),
     listedAt: integer("listed_at", { mode: "timestamp" }),
     views: integer("views"),
+    deposit: real("deposit"),
+    depositCurrency: text("deposit_currency"),
+    floor: text("floor"),
+    hasElevator: integer("has_elevator", { mode: "boolean" }),
+    hasParking: integer("has_parking", { mode: "boolean" }),
+    isFurnished: integer("is_furnished", { mode: "boolean" }),
     rawPayload: text("raw_payload", { mode: "json" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -152,5 +158,26 @@ export const apiKeys = sqliteTable(
   (table) => [
     index("api_keys_user_id_idx").on(table.userId),
     index("api_keys_key_idx").on(table.key),
+  ]
+);
+
+export const pageSnapshots = sqliteTable(
+  "page_snapshots",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    url: text("url").notNull(),
+    snapshot: text("snapshot", { mode: "json" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    index("page_snapshots_user_id_idx").on(table.userId),
+    index("page_snapshots_provider_idx").on(table.provider),
+    index("page_snapshots_created_at_idx").on(table.createdAt),
   ]
 );

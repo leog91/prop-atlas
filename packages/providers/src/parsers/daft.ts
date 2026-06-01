@@ -50,6 +50,12 @@ export class DaftParser implements ProviderParser {
       url: document.URL,
       listedAt: dom.listedAt,
       views: dom.views,
+      deposit: dom.deposit,
+      depositCurrency: dom.deposit ? "EUR" : undefined,
+      floor: dom.floor,
+      hasElevator: dom.hasElevator,
+      hasParking: dom.hasParking,
+      isFurnished: dom.isFurnished,
       rawPayload: { jsonLd, meta, dom },
     };
   }
@@ -59,20 +65,27 @@ export class DaftParser implements ProviderParser {
     for (const script of scripts) {
       try {
         const data = JSON.parse(script.textContent || "");
-        if (data["@type"] === "Residence" || data["@type"] === "RealEstateListing" || data["@type"] === "Place") {
+        const types = Array.isArray(data) ? data.map((d) => d["@type"]) : [data["@type"]];
+        if (
+          types.some((t) =>
+            ["Residence", "RealEstateListing", "Place", "Apartment", "House", "Studio"].includes(t)
+          )
+        ) {
+          const item = Array.isArray(data) ? data.find((d) => d["@type"] !== "BreadcrumbList") : data;
+          if (!item) continue;
           return {
-            name: data.name,
-            description: data.description,
-            price: this.parsePrice(data.price ?? data.offers?.price),
-            propertyType: data.accommodationType ?? data.propertyType,
-            bedrooms: data.numberOfRooms ?? this.extractBedrooms(data.description),
-            bathrooms: data.numberOfBathroomsTotal ?? this.extractBathrooms(data.description),
-            area: this.parseArea(data.floorSize?.value),
-            address: this.formatAddress(data.address),
-            latitude: data.geo?.latitude,
-            longitude: data.geo?.longitude,
-            images: this.normalizeImages(data.image),
-            identifier: data.identifier,
+            name: item.name,
+            description: item.description,
+            price: this.parsePrice(item.price ?? item.offers?.price),
+            propertyType: item.accommodationType ?? item.propertyType ?? item["@type"],
+            bedrooms: item.numberOfRooms ?? this.extractBedrooms(item.description),
+            bathrooms: item.numberOfBathroomsTotal ?? this.extractBathrooms(item.description),
+            area: this.parseArea(item.floorSize?.value),
+            address: this.formatAddress(item.address),
+            latitude: item.geo?.latitude,
+            longitude: item.geo?.longitude,
+            images: this.normalizeImages(item.image ?? item.photo),
+            identifier: item.identifier,
           };
         }
       } catch {}
@@ -107,6 +120,15 @@ export class DaftParser implements ProviderParser {
       .map((img) => img.getAttribute("src") || img.getAttribute("data-src"))
       .filter((src): src is string => !!src && src.startsWith("http"));
 
+    const pageText = (document.body as any)?.innerText ?? "";
+
+    // Extract new fields from DOM text
+    const depositMatch = pageText.match(/deposit[\s:]*€?([\d,.]+)/i);
+    const floorMatch = pageText.match(/(?:first|second|third|fourth|fifth|sixth|ground)\s+floor/i);
+    const hasElevator = /elevator|lift/i.test(pageText);
+    const hasParking = /(?:parking|garage|car\s+space)/i.test(pageText);
+    const isFurnished = /(?:furnished|fully\s+furnished)/i.test(pageText);
+
     return {
       title: titleText || "",
       description: descriptionText,
@@ -120,6 +142,11 @@ export class DaftParser implements ProviderParser {
       listingId: attr('[data-listing-id]', "data-listing-id"),
       listedAt: this.extractListedDate(document),
       views: this.extractViews(document),
+      deposit: depositMatch ? this.parsePrice(depositMatch[1]) : undefined,
+      floor: floorMatch ? floorMatch[0] : undefined,
+      hasElevator: hasElevator || undefined,
+      hasParking: hasParking || undefined,
+      isFurnished: isFurnished || undefined,
       images,
     };
   }
