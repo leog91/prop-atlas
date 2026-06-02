@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 
 const PROVIDER_COUNTRY: Record<string, string> = {
   daft: "ireland",
@@ -76,10 +76,101 @@ interface PropertyCardProps {
   onRemove?: (id: string) => void;
 }
 
+function ImageLightbox({
+  images,
+  initialIndex,
+  onClose,
+}: {
+  images: string[];
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(initialIndex);
+
+  const prev = useCallback(() => {
+    setIndex((i) => (i === 0 ? images.length - 1 : i - 1));
+  }, [images.length]);
+
+  const next = useCallback(() => {
+    setIndex((i) => (i === images.length - 1 ? 0 : i + 1));
+  }, [images.length]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+        aria-label="Close"
+      >
+        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {images.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); prev(); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          aria-label="Previous image"
+        >
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+
+      {images.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); next(); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          aria-label="Next image"
+        >
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+
+      <div className="max-h-[85vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={images[index]}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="max-h-[85vh] max-w-[90vw] object-contain"
+        />
+      </div>
+
+      {images.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
+          {index + 1} / {images.length}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove }: PropertyCardProps) {
   const [isFav, setIsFav] = useState(property.isFavorite);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const images = property.images.length > 0 ? property.images : ["/placeholder-property.svg"];
+  const currentImage = images[imageIndex];
+  const hasMultiple = images.length > 1;
+
+  const nextImage = useCallback(() => {
+    setImageIndex((i) => (i === images.length - 1 ? 0 : i + 1));
+  }, [images.length]);
+
+  const prevImage = useCallback(() => {
+    setImageIndex((i) => (i === 0 ? images.length - 1 : i - 1));
+  }, [images.length]);
 
   const handleFavorite = async () => {
     if (loading) return;
@@ -174,180 +265,224 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
     return { formatted, relative };
   };
 
-  const mainImage = property.images[0] || "/placeholder-property.svg";
-
   return (
-    <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={mainImage}
-          alt={property.title}
-          className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 ${showDeleted ? "grayscale opacity-60" : ""}`}
-        />
-        <div className="absolute right-2 top-2 flex gap-2">
-          <button
-            onClick={handleFavorite}
-            disabled={loading}
-            className="rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
-            aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-          >
-            <svg
-              className={`h-5 w-5 ${isFav ? "fill-red-500 text-red-500" : "fill-none text-gray-600 dark:text-gray-400"}`}
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-          </button>
-          <button
-            onClick={handleDeleteToggle}
-            disabled={deleteLoading}
-            className="rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
-            aria-label={showDeleted ? "Restore property" : "Delete property"}
-          >
-            <svg
-              className="h-5 w-5 text-gray-600 dark:text-gray-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              {showDeleted ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              )}
-            </svg>
-          </button>
-        </div>
-        <div className="absolute left-2 top-2 flex gap-1">
-          <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
-            {property.listingType === "rent" ? "Rent" : "Buy"}
-          </span>
-          <span className="flex items-center gap-1 rounded bg-gray-900/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
-            <FlagIcon country={PROVIDER_COUNTRY[property.provider]} />
-            {property.provider}
-          </span>
-        </div>
-      </div>
+    <>
+      <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentImage}
+            alt={property.title}
+            referrerPolicy="no-referrer"
+            onClick={() => setLightboxOpen(true)}
+            className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 cursor-pointer ${showDeleted ? "grayscale opacity-60" : ""}`}
+          />
 
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-1 text-sm font-medium">{property.title}</h3>
-        </div>
-
-        <p className="mt-1 text-lg font-semibold">
-          {property.price === 0 ? (
-            <span className="text-base font-normal text-gray-500">Contact for price</span>
-          ) : (
+          {hasMultiple && (
             <>
-              {formatPrice(property.price, property.currency)}
-              {property.listingType === "rent" && (
-                <span className="text-sm font-normal text-gray-500">/mo</span>
-              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/50 group-hover:opacity-100"
+                aria-label="Previous image"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/50 group-hover:opacity-100"
+                aria-label="Next image"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); setImageIndex(i); }}
+                    className={`h-1.5 rounded-full transition-all ${i === imageIndex ? "w-4 bg-white" : "w-1.5 bg-white/60 hover:bg-white/80"}`}
+                    aria-label={`Go to image ${i + 1}`}
+                  />
+                ))}
+              </div>
             </>
           )}
-        </p>
 
-        {property.expenses != null && property.expenses > 0 && (
-          <p className="mt-0.5 text-xs text-gray-500">
-            Expenses {formatPrice(property.expenses, property.expensesCurrency || "ARS")}/mo
-          </p>
-        )}
-
-        {(property.city || property.country) && (
-          <p className="mt-1 text-sm text-gray-500">
-            {[property.city, property.country].filter(Boolean).join(", ")}
-          </p>
-        )}
-
-        <div className="mt-3 flex items-center gap-3 text-xs text-gray-500">
-          {property.bedrooms != null && (
-            <span>{property.bedrooms} bed</span>
-          )}
-          {property.bathrooms != null && (
-            <span>{property.bathrooms} bath</span>
-          )}
-          {property.area != null && (
-            <span>
-              {property.area} {property.areaUnit || "m²"}
+          <div className="absolute right-2 top-2 flex gap-2">
+            <button
+              onClick={handleFavorite}
+              disabled={loading}
+              className="rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
+              aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
+            >
+              <svg
+                className={`h-5 w-5 ${isFav ? "fill-red-500 text-red-500" : "fill-none text-gray-600 dark:text-gray-400"}`}
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={handleDeleteToggle}
+              disabled={deleteLoading}
+              className="rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-gray-900/90 dark:hover:bg-gray-900"
+              aria-label={showDeleted ? "Restore property" : "Delete property"}
+            >
+              <svg
+                className="h-5 w-5 text-gray-600 dark:text-gray-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                {showDeleted ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                )}
+              </svg>
+            </button>
+          </div>
+          <div className="absolute left-2 top-2 flex gap-1">
+            <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+              {property.listingType === "rent" ? "Rent" : "Buy"}
             </span>
-          )}
+            <span className="flex items-center gap-1 rounded bg-gray-900/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+              <FlagIcon country={PROVIDER_COUNTRY[property.provider]} />
+              {property.provider}
+            </span>
+          </div>
         </div>
 
-        {(property.listedAt || property.views != null) && (
-          <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
-            {property.listedAt && (() => {
-              const { formatted, relative } = formatDate(property.listedAt);
-              return (
-                <span>
-                  Listed {formatted}
-                  {relative && ` (${relative})`}
-                </span>
-              );
-            })()}
-            {property.views != null && (
-              <span>{property.views.toLocaleString()} views</span>
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="line-clamp-1 text-sm font-medium">{property.title}</h3>
+          </div>
+
+          <p className="mt-1 text-lg font-semibold">
+            {property.price === 0 ? (
+              <span className="text-base font-normal text-gray-500">Contact for price</span>
+            ) : (
+              <>
+                {formatPrice(property.price, property.currency)}
+                {property.listingType === "rent" && (
+                  <span className="text-sm font-normal text-gray-500">/mo</span>
+                )}
+              </>
+            )}
+          </p>
+
+          {property.expenses != null && property.expenses > 0 && (
+            <p className="mt-0.5 text-xs text-gray-500">
+              Expenses {formatPrice(property.expenses, property.expensesCurrency || "ARS")}/mo
+            </p>
+          )}
+
+          {(property.city || property.country) && (
+            <p className="mt-1 text-sm text-gray-500">
+              {[property.city, property.country].filter(Boolean).join(", ")}
+            </p>
+          )}
+
+          <div className="mt-3 flex items-center gap-3 text-xs text-gray-500">
+            {property.bedrooms != null && (
+              <span>{property.bedrooms} bed</span>
+            )}
+            {property.bathrooms != null && (
+              <span>{property.bathrooms} bath</span>
+            )}
+            {property.area != null && (
+              <span>
+                {property.area} {property.areaUnit || "m²"}
+              </span>
             )}
           </div>
-        )}
 
-        {(property.savedAt || property.updatedAt) && (
-          <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
-            {property.savedAt && (() => {
-              const { formatted, relative } = formatDate(property.savedAt);
-              return (
-                <span>
-                  Saved {formatted}
-                  {relative && ` (${relative})`}
-                </span>
-              );
-            })()}
-            {property.updatedAt && (() => {
-              const { formatted, relative } = formatDate(property.updatedAt);
-              return (
-                <span>
-                  Updated {formatted}
-                  {relative && ` (${relative})`}
-                </span>
-              );
-            })()}
-          </div>
-        )}
+          {(property.listedAt || property.views != null) && (
+            <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
+              {property.listedAt && (() => {
+                const { formatted, relative } = formatDate(property.listedAt);
+                return (
+                  <span>
+                    Listed {formatted}
+                    {relative && ` (${relative})`}
+                  </span>
+                );
+              })()}
+              {property.views != null && (
+                <span>{property.views.toLocaleString()} views</span>
+              )}
+            </div>
+          )}
 
-        <a
-          href={property.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 block text-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-        >
-          View on {property.provider}
-        </a>
+          {(property.savedAt || property.updatedAt) && (
+            <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+              {property.savedAt && (() => {
+                const { formatted, relative } = formatDate(property.savedAt);
+                return (
+                  <span>
+                    Saved {formatted}
+                    {relative && ` (${relative})`}
+                  </span>
+                );
+              })()}
+              {property.updatedAt && (() => {
+                const { formatted, relative } = formatDate(property.updatedAt);
+                return (
+                  <span>
+                    Updated {formatted}
+                    {relative && ` (${relative})`}
+                  </span>
+                );
+              })()}
+            </div>
+          )}
 
-        {showDeleted && (
-          <button
-            onClick={handlePermanentDelete}
-            disabled={deleteLoading}
-            className="mt-2 w-full rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+          <a
+            href={property.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 block text-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
           >
-            Delete permanently
-          </button>
-        )}
+            View on {property.provider}
+          </a>
+
+          {showDeleted && (
+            <button
+              onClick={handlePermanentDelete}
+              disabled={deleteLoading}
+              className="mt-2 w-full rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+            >
+              Delete permanently
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+
+      {lightboxOpen && (
+        <ImageLightbox
+          images={images}
+          initialIndex={imageIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+    </>
   );
 }

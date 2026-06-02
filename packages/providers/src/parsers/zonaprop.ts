@@ -39,6 +39,12 @@ export class ZonapropParser implements ProviderParser {
     const bedrooms = jsonLd?.numberOfBedrooms ?? jsonLd?.bedrooms ?? dom.bedrooms;
     const bathrooms = jsonLd?.numberOfBathroomsTotal ?? jsonLd?.bathrooms ?? dom.bathrooms;
 
+    const images = this.collectImages([
+      jsonLd?.images,
+      meta.images,
+      dom.images,
+    ]);
+
     return {
       provider: Provider.ZONAPROP,
       providerListingId,
@@ -59,7 +65,7 @@ export class ZonapropParser implements ProviderParser {
       country: "Argentina",
       latitude: jsonLd?.latitude ?? meta.latitude,
       longitude: jsonLd?.longitude ?? meta.longitude,
-      images: jsonLd?.images ?? meta.images ?? dom.images ?? [],
+      images,
       url: document.URL,
       listedAt: dom.listedAt,
       floor: dom.floor,
@@ -161,10 +167,7 @@ export class ZonapropParser implements ProviderParser {
       }
     }
 
-    const imageElements = document.querySelectorAll('[class*="gallery"] img, [data-testid="gallery"] img');
-    const images = Array.from(imageElements)
-      .map((img) => img.getAttribute("src") || img.getAttribute("data-src"))
-      .filter((src): src is string => !!src && src.startsWith("http"));
+    const images = this.extractImagesFromDom(document);
 
     // Extract floor, elevator, parking, furnished from page text
     const floorMatch = pageText.match(/(\d+ª?\s*(?:planta|piso))/i);
@@ -391,6 +394,76 @@ export class ZonapropParser implements ProviderParser {
     if (!images) return [];
     if (typeof images === "string") return [images];
     return images.filter((url) => url.startsWith("http"));
+  }
+
+  private collectImages(sources: (string | string[] | null | undefined)[]): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+    for (const source of sources) {
+      const urls = this.normalizeImages(source);
+      for (const url of urls) {
+        if (!seen.has(url)) {
+          seen.add(url);
+          results.push(url);
+        }
+      }
+    }
+    return results;
+  }
+
+  private extractImagesFromDom(document: Document): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+
+    const addUrl = (url?: string | null) => {
+      if (!url) return;
+      if (url.startsWith("http") && !seen.has(url)) {
+        seen.add(url);
+        results.push(url);
+      }
+    };
+
+    const selectors = [
+      '[class*="gallery"] img',
+      '[data-testid="gallery"] img',
+      '[class*="carousel"] img',
+      '[class*="slider"] img',
+      '[class*="photo"] img',
+      '[class*="image"] img',
+      'img[src*="zonaprop"]',
+      'img[src*="imgar.zonaprop"]',
+    ];
+
+    for (const selector of selectors) {
+      for (const img of document.querySelectorAll(selector)) {
+        const src =
+          img.getAttribute("data-src") ||
+          img.getAttribute("data-lazy-src") ||
+          img.getAttribute("data-original") ||
+          img.getAttribute("src");
+        addUrl(src);
+
+        const srcset = img.getAttribute("srcset");
+        if (srcset) {
+          const urls = srcset.split(",").map((s) => s.trim().split(" ")[0]);
+          for (const u of urls) addUrl(u);
+        }
+      }
+    }
+
+    for (const el of document.querySelectorAll('[style*="background-image"]')) {
+      const style = el.getAttribute("style") || "";
+      const match = style.match(/url\(["']?([^"')]+)["']?\)/);
+      addUrl(match?.[1]);
+    }
+
+    for (const script of document.querySelectorAll('script[type="application/json"], script[id*="data"]')) {
+      const text = script.textContent || "";
+      const urls = text.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      for (const u of urls) addUrl(u);
+    }
+
+    return results;
   }
 
   private formatAddress(address: any): string | undefined {

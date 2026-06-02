@@ -17,6 +17,7 @@ export interface Snapshot {
   scripts?: { id?: string; type?: string; text?: string }[];
   nodes: SnapshotNode[];
   pageText: string;
+  images?: string[];
 }
 
 export interface PageSnapshot {
@@ -190,6 +191,44 @@ export function SnapshotsContent({ snapshots: initialSnapshots }: SnapshotsConte
                             </pre>
                           </details>
                         ))}
+                      </div>
+                    )}
+
+                    {snapshot.snapshot.images && snapshot.snapshot.images.length > 0 && (
+                      <div className="mb-3">
+                        <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">
+                          Images ({snapshot.snapshot.images.length})
+                        </h4>
+                        <div className="max-h-64 overflow-auto rounded bg-gray-50 p-2 dark:bg-gray-900">
+                          <div className="grid grid-cols-4 gap-2">
+                            {snapshot.snapshot.images.map((url, i) => (
+                              <a
+                                key={i}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative aspect-square overflow-hidden rounded border border-gray-200 dark:border-gray-700"
+                                title={url}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={url}
+                                  alt=""
+                                  referrerPolicy="no-referrer"
+                                  className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                                  loading="lazy"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            {snapshot.snapshot.images.map((url, i) => (
+                              <div key={`url-${i}`} className="break-all font-mono text-[10px] text-gray-500">
+                                {url}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
 

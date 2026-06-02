@@ -24,7 +24,11 @@ export class IdealistaParser implements ProviderParser {
     const listingType = this.detectListingType(document.URL);
     const price = jsonLd?.price ?? meta.price ?? dom.price;
     const title = jsonLd?.name ?? meta.title ?? dom.title ?? "";
-    const images = jsonLd?.images ?? meta.images ?? dom.images ?? [];
+    const images = this.collectImages([
+      jsonLd?.images,
+      meta.images,
+      dom.images,
+    ]);
     const country = this.detectCountry(document.URL);
     const location = this.extractLocation(document);
     const coords = this.extractCoordinates(document);
@@ -133,12 +137,7 @@ export class IdealistaParser implements ProviderParser {
     const titleText = text("h1") || text(".detail-title") || text("span.main-info__title-main");
     const descriptionText = text(".detail-description") || text("[class*='description']") || text(".comment");
 
-    const imageElements = document.querySelectorAll(
-      '.detail-multimedia img, [class*="gallery"] img, [data-testid="gallery"] img'
-    );
-    const images = Array.from(imageElements)
-      .map((img) => img.getAttribute("src") || img.getAttribute("data-src"))
-      .filter((src): src is string => !!src && src.startsWith("http"));
+    const images = this.extractImagesFromDom(document);
 
     const featuresText = document.body.textContent || "";
 
@@ -365,6 +364,77 @@ export class IdealistaParser implements ProviderParser {
     if (!images) return [];
     if (typeof images === "string") return [images];
     return images.filter((url) => url.startsWith("http"));
+  }
+
+  private collectImages(sources: (string | string[] | null | undefined)[]): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+    for (const source of sources) {
+      const urls = this.normalizeImages(source);
+      for (const url of urls) {
+        if (!seen.has(url)) {
+          seen.add(url);
+          results.push(url);
+        }
+      }
+    }
+    return results;
+  }
+
+  private extractImagesFromDom(document: Document): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+
+    const addUrl = (url?: string | null) => {
+      if (!url) return;
+      if (url.startsWith("http") && !seen.has(url)) {
+        seen.add(url);
+        results.push(url);
+      }
+    };
+
+    const selectors = [
+      '.detail-multimedia img',
+      '[class*="gallery"] img',
+      '[data-testid="gallery"] img',
+      '[class*="carousel"] img',
+      '[class*="slider"] img',
+      '[class*="photo"] img',
+      '[class*="image"] img',
+      'img[src*="idealista"]',
+      'img[src*="img3.idealista"]',
+    ];
+
+    for (const selector of selectors) {
+      for (const img of document.querySelectorAll(selector)) {
+        const src =
+          img.getAttribute("data-src") ||
+          img.getAttribute("data-lazy-src") ||
+          img.getAttribute("data-original") ||
+          img.getAttribute("src");
+        addUrl(src);
+
+        const srcset = img.getAttribute("srcset");
+        if (srcset) {
+          const urls = srcset.split(",").map((s) => s.trim().split(" ")[0]);
+          for (const u of urls) addUrl(u);
+        }
+      }
+    }
+
+    for (const el of document.querySelectorAll('[style*="background-image"]')) {
+      const style = el.getAttribute("style") || "";
+      const match = style.match(/url\(["']?([^"')]+)["']?\)/);
+      addUrl(match?.[1]);
+    }
+
+    for (const script of document.querySelectorAll('script[type="application/json"], script[id*="data"]')) {
+      const text = script.textContent || "";
+      const urls = text.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      for (const u of urls) addUrl(u);
+    }
+
+    return results;
   }
 
   private formatAddress(address: any): string | undefined {

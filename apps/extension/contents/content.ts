@@ -65,6 +65,12 @@ function buildSemanticMap(document: Document) {
     attributes?: Record<string, string>;
   }[] = [];
 
+  const imageUrls = new Set<string>();
+  const addImageUrl = (url?: string | null) => {
+    if (!url) return;
+    if (url.startsWith("http")) imageUrls.add(url);
+  };
+
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_ELEMENT,
@@ -103,10 +109,31 @@ function buildSemanticMap(document: Document) {
       if (href) attributes.href = href;
     }
     if (isImage) {
-      const src = el.getAttribute("src") || el.getAttribute("data-src");
+      const src = el.getAttribute("src") || el.getAttribute("data-src") || el.getAttribute("data-lazy-src") || el.getAttribute("data-original");
       if (src) attributes.src = src;
+      const srcset = el.getAttribute("srcset") || el.getAttribute("data-srcset");
+      if (srcset) attributes.srcset = srcset;
       const alt = el.getAttribute("alt");
       if (alt) attributes.alt = alt;
+
+      // Collect image URLs from this img tag
+      addImageUrl(el.getAttribute("src"));
+      addImageUrl(el.getAttribute("data-src"));
+      addImageUrl(el.getAttribute("data-lazy-src"));
+      addImageUrl(el.getAttribute("data-original"));
+      if (srcset) {
+        srcset.split(",").forEach((s) => addImageUrl(s.trim().split(" ")[0]));
+      }
+    }
+
+    // Capture background images from inline styles on any element
+    const style = el.getAttribute("style");
+    if (style) {
+      const bgMatch = style.match(/url\(["']?([^"')]+)["']?\)/);
+      if (bgMatch) {
+        attributes["bg-image"] = bgMatch[1];
+        addImageUrl(bgMatch[1]);
+      }
     }
 
     // Include data-* attributes (often used by React/Vue for test IDs)
@@ -141,18 +168,36 @@ function buildSemanticMap(document: Document) {
       id.includes("data") ||
       type.includes("json")
     ) {
-      const text = script.textContent?.slice(0, 10000) || "";
-      if (text.length > 0) {
-        try {
-          // If it's valid JSON, parse it to make the snapshot cleaner
-          const parsed = JSON.parse(text);
-          scripts.push({ id, type, text: JSON.stringify(parsed).slice(0, 5000) });
-        } catch {
-          scripts.push({ id, type, text: text.slice(0, 5000) });
-        }
+      const fullText = script.textContent || "";
+      if (fullText.length === 0) return;
+
+      // Extract image URLs BEFORE truncating
+      const urls = fullText.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      urls.forEach(addImageUrl);
+
+      // For __NEXT_DATA__, keep up to 30KB; for others, keep up to 10KB
+      const isNextData = id === "__NEXT_DATA__";
+      const maxLen = isNextData ? 30000 : 10000;
+      const text = fullText.slice(0, maxLen);
+
+      try {
+        const parsed = JSON.parse(text);
+        // For __NEXT_DATA__, stringify back with a higher limit so it remains parseable
+        const stringifyLimit = isNextData ? 25000 : 5000;
+        scripts.push({ id, type, text: JSON.stringify(parsed).slice(0, stringifyLimit) });
+      } catch {
+        const sliceLimit = isNextData ? 25000 : 5000;
+        scripts.push({ id, type, text: text.slice(0, sliceLimit) });
       }
     }
   });
+
+  // Extract image URLs from JSON-LD scripts too
+  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+    const text = script.textContent || "";
+    const urls = text.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+    urls.forEach(addImageUrl);
+  }
 
   return {
     title: document.title,
@@ -162,7 +207,34 @@ function buildSemanticMap(document: Document) {
     scripts,
     nodes,
     pageText,
+    images: Array.from(imageUrls),
   };
+}
+
+function triggerLazyLoad(): Promise<void> {
+  return new Promise((resolve) => {
+    // Briefly scroll to trigger IntersectionObserver-based lazy loading
+    const originalScroll = window.scrollY;
+    const gallery = document.querySelector('[class*="gallery"], [class*="carousel"], [class*="slider"], [data-testid*="gallery"]');
+
+    if (gallery) {
+      // Scroll within the gallery element if possible
+      const el = gallery as HTMLElement;
+      el.scrollLeft = el.scrollWidth;
+      setTimeout(() => {
+        el.scrollLeft = 0;
+        window.scrollTo(0, originalScroll);
+        resolve();
+      }, 250);
+    } else {
+      // Fallback: scroll page to bottom and back
+      window.scrollTo(0, document.body.scrollHeight);
+      setTimeout(() => {
+        window.scrollTo(0, originalScroll);
+        resolve();
+      }, 250);
+    }
+  });
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -179,10 +251,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
 
-    const property = parser.parse(document);
-    console.log("[EXT CONTENT] parsed property:", JSON.stringify(property, null, 2));
-    sendResponse({ property });
-    return;
+    // Trigger lazy loading before parsing to ensure all gallery images are in the DOM
+    triggerLazyLoad().then(() => {
+      const property = parser.parse(document);
+      console.log("[EXT CONTENT] parsed property:", JSON.stringify(property, null, 2));
+      sendResponse({ property });
+    });
+
+    return true; // async response
   }
 
   if (message.type === "ANALYZE_STRUCTURE") {
@@ -195,7 +271,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     console.log(
       "[EXT CONTENT] semantic map nodes:",
       snapshot.nodes.length,
-      "pageText length:", snapshot.pageText.length
+      "pageText length:", snapshot.pageText.length,
+      "images found:", snapshot.images.length
     );
 
     sendResponse({ provider, snapshot });

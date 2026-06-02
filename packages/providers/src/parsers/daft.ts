@@ -9,11 +9,13 @@ export class DaftParser implements ProviderParser {
   }
 
   parse(document: Document): ParsedProperty | null {
+    const nextData = this.extractNextData(document);
     const jsonLd = this.extractJsonLd(document);
     const meta = this.extractMeta(document);
     const dom = this.extractFromDom(document);
 
     const providerListingId =
+      nextData?.listingId ||
       jsonLd?.identifier ||
       meta.listingId ||
       dom.listingId ||
@@ -22,42 +24,243 @@ export class DaftParser implements ProviderParser {
     if (!providerListingId) return null;
 
     const listingType = this.detectListingType(document.URL, meta);
-    const price = jsonLd?.price || meta.price || dom.price;
-    const title = jsonLd?.name || meta.title || dom.title || "";
-    const images = (jsonLd?.images?.length ? jsonLd.images : null) || 
-                   (meta.images?.length ? meta.images : null) || 
-                   (dom.images?.length ? dom.images : null) || [];
+    const price = nextData?.price ?? jsonLd?.price ?? meta.price ?? dom.price;
+    const title = nextData?.title ?? jsonLd?.name ?? meta.title ?? dom.title ?? "";
+    const rawImages = this.collectImages([
+      nextData?.images,
+      jsonLd?.images,
+      meta.images,
+      dom.images,
+    ]);
+    const images = this.dedupeAndFilterDaftImages(rawImages);
 
     return {
       provider: Provider.DAFT,
       providerListingId,
       listingType,
       title,
-      description: jsonLd?.description ?? dom.description,
+      description: nextData?.description ?? jsonLd?.description ?? dom.description,
       price,
       currency: "EUR",
-      propertyType: this.mapPropertyType(jsonLd?.propertyType ?? dom.propertyType),
-      bedrooms: jsonLd?.bedrooms ?? dom.bedrooms,
-      bathrooms: jsonLd?.bathrooms ?? dom.bathrooms,
-      area: jsonLd?.area ?? dom.area,
+      propertyType: this.mapPropertyType(nextData?.propertyType ?? jsonLd?.propertyType ?? dom.propertyType),
+      bedrooms: nextData?.bedrooms ?? jsonLd?.bedrooms ?? dom.bedrooms,
+      bathrooms: nextData?.bathrooms ?? jsonLd?.bathrooms ?? dom.bathrooms,
+      area: nextData?.area ?? jsonLd?.area ?? dom.area,
       areaUnit: "sqft",
-      address: jsonLd?.address ?? dom.address,
-      city: dom.city,
+      address: nextData?.address ?? jsonLd?.address ?? dom.address,
+      city: nextData?.city ?? dom.city,
       country: "Ireland",
-      latitude: jsonLd?.latitude ?? meta.latitude,
-      longitude: jsonLd?.longitude ?? meta.longitude,
+      latitude: nextData?.latitude ?? jsonLd?.latitude ?? meta.latitude,
+      longitude: nextData?.longitude ?? jsonLd?.longitude ?? meta.longitude,
       images,
       url: document.URL,
       listedAt: dom.listedAt,
       views: dom.views,
-      deposit: dom.deposit,
-      depositCurrency: dom.deposit ? "EUR" : undefined,
-      floor: dom.floor,
-      hasElevator: dom.hasElevator,
-      hasParking: dom.hasParking,
-      isFurnished: dom.isFurnished,
-      rawPayload: { jsonLd, meta, dom },
+      deposit: nextData?.deposit ?? dom.deposit,
+      depositCurrency: (nextData?.deposit ?? dom.deposit) ? "EUR" : undefined,
+      floor: nextData?.floor ?? dom.floor,
+      hasElevator: nextData?.hasElevator ?? dom.hasElevator,
+      hasParking: nextData?.hasParking ?? dom.hasParking,
+      isFurnished: nextData?.isFurnished ?? dom.isFurnished,
+      rawPayload: { nextData, jsonLd, meta, dom },
     };
+  }
+
+  private extractNextData(document: Document): Record<string, any> | null {
+    const script = document.querySelector('#__NEXT_DATA__');
+    if (!script?.textContent) return null;
+
+    try {
+      const data = JSON.parse(script.textContent);
+      const pageProps = data?.props?.pageProps ?? data;
+
+      // Daft embeds listing data in various paths; try the most common ones
+      const listing =
+        pageProps?.listing ??
+        pageProps?.targetPageProps?.listingDetails ??
+        pageProps?.data ??
+        pageProps?.property ??
+        pageProps?.ad ??
+        this.findListingObject(pageProps);
+
+      if (!listing || typeof listing !== "object") return null;
+
+      // Deep-search for image arrays/URLs inside the listing object
+      const foundImages = this.deepFindImages(listing);
+
+      return {
+        listingId: String(listing.id ?? listing.listingId ?? listing.identifier ?? ""),
+        title: listing.title ?? listing.name ?? listing.heading,
+        description: listing.description ?? listing.metaDescription,
+        price: this.parsePrice(listing.price ?? listing.monthlyRent ?? listing.rent),
+        propertyType: listing.propertyType ?? listing.type ?? listing.category,
+        bedrooms: listing.bedrooms ?? listing.beds ?? listing.numberOfBedrooms ?? this.extractBedrooms(listing.description),
+        bathrooms: listing.bathrooms ?? listing.baths ?? listing.numberOfBathrooms,
+        area: this.parseArea(listing.floorArea ?? listing.area ?? listing.squareFeet ?? listing.size),
+        address: listing.displayAddress ?? listing.address ?? this.formatAddress(listing.location ?? listing.address),
+        city: listing.town ?? listing.city ?? listing.addressLocality,
+        latitude: listing.latitude ?? listing.lat ?? listing.geo?.latitude,
+        longitude: listing.longitude ?? listing.lng ?? listing.lon ?? listing.geo?.longitude,
+        images: foundImages.length > 0 ? foundImages : undefined,
+        deposit: this.parsePrice(listing.deposit ?? listing.securityDeposit),
+        floor: listing.floor ?? listing.floorNumber,
+        hasElevator: listing.hasElevator ?? listing.lift ?? listing.elevator,
+        hasParking: listing.hasParking ?? listing.parking ?? listing.garage,
+        isFurnished: listing.isFurnished ?? listing.furnished,
+      };
+    } catch (e) {
+      console.error('[DAFT] Failed to parse __NEXT_DATA__:', e);
+      return null;
+    }
+  }
+
+  private findListingObject(obj: any): any {
+    if (!obj || typeof obj !== "object") return null;
+    if (obj.id && (obj.images || obj.photos || obj.media || obj.gallery || obj.image)) return obj;
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val && typeof val === "object") {
+        const found = this.findListingObject(val);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  private deepFindImages(obj: any): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+
+    const isImageUrl = (val: any): boolean => {
+      return typeof val === "string" && val.startsWith("http") && /\.(jpg|jpeg|png|webp)/i.test(val);
+    };
+
+    const addUrl = (val: any) => {
+      if (!isImageUrl(val)) return;
+      if (!seen.has(val)) {
+        seen.add(val);
+        results.push(val);
+      }
+    };
+
+    const traverse = (current: any) => {
+      if (!current || typeof current !== "object") return;
+      if (Array.isArray(current)) {
+        for (const item of current) {
+          if (isImageUrl(item)) {
+            addUrl(item);
+          } else if (typeof item === "object") {
+            traverse(item);
+          }
+        }
+        return;
+      }
+      for (const [key, val] of Object.entries(current)) {
+        const lowerKey = key.toLowerCase();
+        if (
+          lowerKey === "image" ||
+          lowerKey === "images" ||
+          lowerKey === "photo" ||
+          lowerKey === "photos" ||
+          lowerKey === "picture" ||
+          lowerKey === "pictures" ||
+          lowerKey === "media" ||
+          lowerKey === "gallery" ||
+          lowerKey === "src" ||
+          lowerKey === "url" ||
+          lowerKey === "urls" ||
+          lowerKey === "uri" ||
+          lowerKey === "uris"
+        ) {
+          if (Array.isArray(val)) {
+            for (const item of val) addUrl(item);
+          } else if (typeof val === "object" && val !== null) {
+            traverse(val);
+          } else {
+            addUrl(val);
+          }
+        } else if (typeof val === "object" && val !== null) {
+          traverse(val);
+        }
+      }
+    };
+
+    traverse(obj);
+    return this.dedupeAndFilterDaftImages(results);
+  }
+
+  private dedupeAndFilterDaftImages(urls: string[]): string[] {
+    // Group images by their underlying S3 key, keep the largest variant,
+    // and filter out thumbnails, avatars, and profile placeholders.
+    const groups = new Map<string, { width: number; height: number; url: string }[]>();
+
+    for (const rawUrl of urls) {
+      let url = rawUrl;
+
+      // Unwrap Next.js _next/image optimizer URLs
+      if (url.includes("_next/image")) {
+        try {
+          const u = new URL(url);
+          const wrapped = u.searchParams.get("url");
+          if (wrapped) url = decodeURIComponent(wrapped);
+        } catch {}
+      }
+
+      // Only process media.daft.ie URLs
+      if (!url.includes("media.daft.ie/")) continue;
+
+      const parts = url.split("media.daft.ie/");
+      if (parts.length < 2) continue;
+      const b64Part = parts[1].split("?")[0];
+
+      try {
+        const pad = 4 - (b64Part.length % 4);
+        const padded = pad === 4 ? b64Part : b64Part + "=".repeat(pad);
+        const decoded = JSON.parse(atob(padded));
+        const key: string = decoded.key || "";
+        const resize = decoded.edits?.resize || {};
+        const width = resize.width || resize.w || 0;
+        const height = resize.height || resize.h || 0;
+
+        // Skip known non-property images
+        const keyLower = key.toLowerCase();
+        if (
+          keyLower.includes("profile") ||
+          keyLower.includes("avatar") ||
+          keyLower.includes("_standard") ||
+          keyLower.includes("no-profile") ||
+          keyLower.includes("agent") ||
+          keyLower.includes("logo") ||
+          keyLower.includes("watermark")
+        ) {
+          continue;
+        }
+
+        // Skip tiny thumbnails (nav thumbs, agent icons, etc.)
+        if (width > 0 && width < 150) continue;
+        if (height > 0 && height < 100) continue;
+
+        const list = groups.get(key) || [];
+        list.push({ width, height, url: rawUrl });
+        groups.set(key, list);
+      } catch {
+        // If we can't decode, keep the URL as a fallback
+        const list = groups.get(url) || [];
+        list.push({ width: 0, height: 0, url: rawUrl });
+        groups.set(url, list);
+      }
+    }
+
+    // For each key, pick the largest image by pixel area
+    const bestUrls: string[] = [];
+    for (const [, variants] of groups) {
+      const best = variants.reduce((a, b) =>
+        a.width * a.height >= b.width * b.height ? a : b
+      );
+      bestUrls.push(best.url);
+    }
+
+    return bestUrls;
   }
 
   private extractJsonLd(document: Document): Record<string, any> | null {
@@ -115,10 +318,7 @@ export class DaftParser implements ProviderParser {
     const titleText = text("h1") || text('[data-testid="title"]');
     const descriptionText = text('[data-testid="description"]') || text("[class*='description']");
 
-    const imageElements = document.querySelectorAll('[data-testid="gallery-image"] img, .Gallery img, [class*="gallery"] img');
-    const images = Array.from(imageElements)
-      .map((img) => img.getAttribute("src") || img.getAttribute("data-src"))
-      .filter((src): src is string => !!src && src.startsWith("http"));
+    const images = this.extractImagesFromDom(document);
 
     const pageText = (document.body as any)?.innerText ?? "";
 
@@ -201,6 +401,81 @@ export class DaftParser implements ProviderParser {
     if (!images) return [];
     if (typeof images === "string") return [images];
     return images.filter((url) => url.startsWith("http"));
+  }
+
+  private collectImages(sources: (string | string[] | null | undefined)[]): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+    for (const source of sources) {
+      const urls = this.normalizeImages(source);
+      for (const url of urls) {
+        if (!seen.has(url)) {
+          seen.add(url);
+          results.push(url);
+        }
+      }
+    }
+    return results;
+  }
+
+  private extractImagesFromDom(document: Document): string[] {
+    const seen = new Set<string>();
+    const results: string[] = [];
+
+    const addUrl = (url?: string | null) => {
+      if (!url) return;
+      if (url.startsWith("http") && !seen.has(url)) {
+        seen.add(url);
+        results.push(url);
+      }
+    };
+
+    // 1. Standard img tags with various lazy-load attributes
+    const selectors = [
+      '[data-testid="gallery-image"] img',
+      '.Gallery img',
+      '[class*="gallery"] img',
+      '[class*="carousel"] img',
+      '[class*="slider"] img',
+      '[class*="photo"] img',
+      '[class*="image"] img',
+      'img[src*="daftcdn"]',
+      'img[src*="media.daft"]',
+    ];
+
+    for (const selector of selectors) {
+      for (const img of document.querySelectorAll(selector)) {
+        const src =
+          img.getAttribute("data-src") ||
+          img.getAttribute("data-lazy-src") ||
+          img.getAttribute("data-original") ||
+          img.getAttribute("src");
+        addUrl(src);
+
+        // Parse srcset for additional URLs
+        const srcset = img.getAttribute("srcset");
+        if (srcset) {
+          const urls = srcset.split(",").map((s) => s.trim().split(" ")[0]);
+          for (const u of urls) addUrl(u);
+        }
+      }
+    }
+
+    // 2. Background images from inline styles (common in some gallery implementations)
+    for (const el of document.querySelectorAll('[style*="background-image"]')) {
+      const style = el.getAttribute("style") || "";
+      const match = style.match(/url\(["']?([^"')]+)["']?\)/);
+      addUrl(match?.[1]);
+    }
+
+    // 3. Look for image URLs in script/json data (some sites embed galleries in JSON)
+    for (const script of document.querySelectorAll('script[type="application/json"], script[id*="data"]')) {
+      const text = script.textContent || "";
+      const urls = text.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      for (const u of urls) addUrl(u);
+    }
+
+    return results;
   }
 
   private formatAddress(address: any): string | undefined {
