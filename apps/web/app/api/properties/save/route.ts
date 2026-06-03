@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "@prop-atlas/db";
 import { propertySchema } from "@prop-atlas/types";
-import { properties, propertyImages, savedProperties, propertyPriceHistory } from "@prop-atlas/db";
+import { properties, propertyImages, savedProperties, propertyPriceHistory, geocodeCache } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
 import crypto from "crypto";
@@ -250,6 +250,24 @@ export async function POST(request: NextRequest) {
     debugLog("[GEOCODE] Address:", data.address, "City:", data.city, "Country:", data.country);
     for (const query of getGeocodeQueries({ ...data, rawPayload: incomingRawPayload })) {
       debugLog("[GEOCODE] Trying:", query);
+      
+      // Check cache first
+      const cached = await db
+        .select()
+        .from(geocodeCache)
+        .where(eq(geocodeCache.query, query))
+        .limit(1);
+
+      if (cached.length > 0) {
+        latitude = cached[0].latitude;
+        longitude = cached[0].longitude;
+        isApproximateLocation = true;
+        geocodeQueryUsed = query;
+        debugLog("[GEOCODE] Cache hit:", { query, latitude, longitude });
+        break;
+      }
+
+      // Query OpenStreetMap Nominatim
       const geocoded = await geocodeQuery(query);
       if (geocoded) {
         latitude = geocoded.latitude;
@@ -257,6 +275,18 @@ export async function POST(request: NextRequest) {
         isApproximateLocation = true;
         geocodeQueryUsed = query;
         debugLog("[GEOCODE] Success:", { query, ...geocoded });
+
+        // Save to cache
+        try {
+          await db.insert(geocodeCache).values({
+            query,
+            latitude,
+            longitude,
+          });
+          debugLog("[GEOCODE] Saved to cache:", query);
+        } catch (cacheErr) {
+          console.error("[GEOCODE] Failed to cache:", cacheErr);
+        }
         break;
       }
     }

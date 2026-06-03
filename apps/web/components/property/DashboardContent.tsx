@@ -37,6 +37,8 @@ interface Property {
   updatedAt?: Date | string | null;
   savedAt?: Date | string | null;
   savedUpdatedAt?: Date | string | null;
+  notes?: string | null;
+  priceHistory?: Array<{ id: string; price: number; currency: string; recordedAt: Date | string }> | null;
 }
 
 interface DashboardContentProps {

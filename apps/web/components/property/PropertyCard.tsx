@@ -70,6 +70,8 @@ interface PropertyCardProps {
     savedUpdatedAt?: Date | string | null;
     expenses?: number | null;
     expensesCurrency?: string | null;
+    notes?: string | null;
+    priceHistory?: Array<{ id: string; price: number; currency: string; recordedAt: Date | string }> | null;
   };
   onToggleFavorite?: (id: string) => void;
   showDeleted?: boolean;
@@ -159,6 +161,47 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  
+  const [notes, setNotes] = useState(property.notes || "");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+
+  const handleSaveNotes = async (text: string) => {
+    setNotesSaving(true);
+    try {
+      const res = await fetch(`/api/properties/${property.id}/notes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: text || null }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(data.notes || "");
+        setIsEditingNotes(false);
+      }
+    } catch (err) {
+      console.error("Failed to save notes:", err);
+    } finally {
+      setNotesSaving(false);
+    }
+  };
+
+  const getPriceTrend = () => {
+    if (!property.priceHistory || property.priceHistory.length <= 1) return null;
+    const prices = property.priceHistory.map((h) => h.price);
+    const maxPrice = Math.max(...prices);
+    
+    if (property.price > 0 && maxPrice > property.price) {
+      const percentDrop = Math.round(((maxPrice - property.price) / maxPrice) * 100);
+      return {
+        percentDrop,
+        maxPrice,
+      };
+    }
+    return null;
+  };
+
+  const priceTrend = getPriceTrend();
 
   const images = property.images.length > 0 ? property.images : ["/placeholder-property.svg"];
   const currentImage = images[imageIndex];
@@ -376,18 +419,31 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
             <h3 className="line-clamp-1 text-sm font-medium">{property.title}</h3>
           </div>
 
-          <p className="mt-1 text-lg font-semibold">
-            {property.price === 0 ? (
-              <span className="text-base font-normal text-gray-500">Contact for price</span>
-            ) : (
-              <>
-                {formatPrice(property.price, property.currency)}
-                {property.listingType === "rent" && (
-                  <span className="text-sm font-normal text-gray-500">/mo</span>
-                )}
-              </>
+          <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+            <p className="text-lg font-semibold">
+              {property.price === 0 ? (
+                <span className="text-base font-normal text-gray-500">Contact for price</span>
+              ) : (
+                <>
+                  {formatPrice(property.price, property.currency)}
+                  {property.listingType === "rent" && (
+                    <span className="text-sm font-normal text-gray-500">/mo</span>
+                  )}
+                </>
+              )}
+            </p>
+            {priceTrend && (
+              <span 
+                className="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                title={`Price dropped from ${formatPrice(priceTrend.maxPrice, property.currency)}`}
+              >
+                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M14.707 12.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                {priceTrend.percentDrop}%
+              </span>
             )}
-          </p>
+          </div>
 
           {property.expenses != null && property.expenses > 0 && (
             <p className="mt-0.5 text-xs text-gray-500">
@@ -454,6 +510,54 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
               })()}
             </div>
           )}
+
+          {/* Notes Section */}
+          <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Notes</span>
+              {!isEditingNotes && (
+                <button
+                  onClick={() => setIsEditingNotes(true)}
+                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {notes ? "Edit" : "Add Note"}
+                </button>
+              )}
+            </div>
+            {isEditingNotes ? (
+              <div className="space-y-2">
+                <textarea
+                  defaultValue={notes}
+                  id={`notes-${property.id}`}
+                  placeholder="Add notes about this listing..."
+                  rows={2}
+                  className="w-full rounded-md border border-gray-300 p-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setIsEditingNotes(false)}
+                    className="rounded border border-gray-300 px-2.5 py-1 text-[10px] font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById(`notes-${property.id}`) as HTMLTextAreaElement;
+                      handleSaveNotes(el.value);
+                    }}
+                    disabled={notesSaving}
+                    className="rounded bg-blue-600 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {notesSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 italic">
+                {notes || "No notes added yet."}
+              </p>
+            )}
+          </div>
 
           <a
             href={property.url}

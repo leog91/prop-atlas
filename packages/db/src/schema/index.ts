@@ -181,3 +181,15 @@ export const pageSnapshots = sqliteTable(
     index("page_snapshots_created_at_idx").on(table.createdAt),
   ]
 );
+
+export const geocodeCache = sqliteTable(
+  "geocode_cache",
+  {
+    query: text("query").primaryKey(),
+    latitude: real("latitude").notNull(),
+    longitude: real("longitude").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  }
+);

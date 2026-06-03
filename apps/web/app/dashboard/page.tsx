@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { eq, and, desc, inArray, like, sql, isNull, isNotNull } from "@prop-atlas/db";
-import { properties, propertyImages, savedProperties } from "@prop-atlas/db";
+import { properties, propertyImages, savedProperties, propertyPriceHistory } from "@prop-atlas/db";
 import { getDb } from "@/lib/db";
 import { DashboardContent } from "@/components/property/DashboardContent";
 import { ApiKeyManager } from "@/components/ApiKeyManager";
@@ -99,11 +99,33 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     imagesByProperty.set(img.propertyId, list);
   }
 
+  const priceHistory = propertyIds.length
+    ? await db
+        .select()
+        .from(propertyPriceHistory)
+        .where(inArray(propertyPriceHistory.propertyId, propertyIds))
+        .orderBy(desc(propertyPriceHistory.recordedAt))
+    : [];
+
+  const priceHistoryByProperty = new Map<string, typeof priceHistory>();
+  for (const hist of priceHistory) {
+    const list = priceHistoryByProperty.get(hist.propertyId) || [];
+    list.push(hist);
+    priceHistoryByProperty.set(hist.propertyId, list);
+  }
+
   const data = results.map(({ property, saved }) => ({
     ...property,
     images: (imagesByProperty.get(property.id) || [])
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((i) => i.url),
+    priceHistory: (priceHistoryByProperty.get(property.id) || [])
+      .map(p => ({
+        id: p.id,
+        price: p.price,
+        currency: p.currency,
+        recordedAt: p.recordedAt,
+      })),
     savedAt: saved.savedAt,
     savedUpdatedAt: saved.updatedAt,
     isFavorite: saved.isFavorite,
