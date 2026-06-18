@@ -35,13 +35,20 @@ export async function OPTIONS(request: NextRequest) {
 
 function parseListedDate(value?: string | null): Date | null {
   if (!value) return null;
+
+  // Providers (Daft, Idealista, Kamernet, Zonaprop) use dd/mm/yyyy.
+  // Parse this format explicitly before falling back to the Date constructor,
+  // because new Date("11/05/2026") would interpret it as mm/dd/yyyy.
+  const slashMatch = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    const parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
   const d = new Date(value);
   if (!isNaN(d.getTime())) return d;
-  const match = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (match) {
-    const [, day, month, year] = match;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  }
+
   const spanishMatch = value.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)/i);
   if (spanishMatch) {
     const [, day, monthName] = spanishMatch;

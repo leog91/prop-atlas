@@ -298,37 +298,62 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
   };
 
   const formatDate = (input: string | Date) => {
-    const dateStr = typeof input === 'string' ? input : input.toISOString();
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      const match = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (match) {
-        const [, day, month, year] = match;
-        return {
-          formatted: `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`,
-          relative: ''
-        };
+    let date: Date;
+
+    if (input instanceof Date) {
+      date = input;
+    } else {
+      // Providers use dd/mm/yyyy. Parse explicitly before generic Date parsing
+      // to avoid JavaScript interpreting "11/05/2026" as 5 November.
+      const slashMatch = input.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (slashMatch) {
+        const [, day, month, year] = slashMatch;
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        const parsedIso = new Date(input);
+        if (!isNaN(parsedIso.getTime())) {
+          date = parsedIso;
+        } else {
+          return { formatted: input, relative: '' };
+        }
       }
-      return { formatted: dateStr, relative: '' };
     }
-    
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    const formatted = `${day}/${month}/${year}`;
-    
+
+    if (isNaN(date.getTime())) {
+      return { formatted: typeof input === 'string' ? input : input.toISOString(), relative: '' };
+    }
+
+    const formatted = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
+
+    // Listed dates should not be in the future. If they are, just show the date.
+    if (diffMs < 0) {
+      return { formatted, relative: '' };
+    }
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     let relative = '';
     if (diffDays === 0) relative = 'Today';
     else if (diffDays === 1) relative = 'Yesterday';
     else if (diffDays < 7) relative = `${diffDays} days ago`;
-    else if (diffDays < 30) relative = `${Math.floor(diffDays / 7)} weeks ago`;
-    else if (diffDays < 365) relative = `${Math.floor(diffDays / 30)} months ago`;
-    else relative = `${Math.floor(diffDays / 365)} years ago`;
-    
+    else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      relative = `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+    } else if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      relative = `${months} month${months === 1 ? '' : 's'} ago`;
+    } else {
+      const years = Math.floor(diffDays / 365);
+      relative = `${years} year${years === 1 ? '' : 's'} ago`;
+    }
+
     return { formatted, relative };
   };
 
