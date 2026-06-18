@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Prop Atlas - Property Tracker",
   description: "Track rental and buy listings from multiple providers in one place",
+  icons: {
+    icon: "/house.png",
+  },
 };
 
 export default function RootLayout({
