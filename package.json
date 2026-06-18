@@ -11,7 +11,10 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "db:seed:demo": "bun run --filter @prop-atlas/web db:seed:demo",
+    "db:reset:demo": "bun run --filter @prop-atlas/web db:reset:demo",
+    "db:export:demo": "bun run --filter @prop-atlas/web db:export:demo"
   },
   "devDependencies": {
     "turbo": "^2.9.16",

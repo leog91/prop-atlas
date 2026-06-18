@@ -4,7 +4,7 @@ A property listing aggregator. Save rentals and sales from multiple platforms in
 
 ## Tech Stack
 
-- **Web**: Next.js 16, React 18, TypeScript, Tailwind CSS
+- **Web**: Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Auth**: Better Auth
 - **Database**: Turso (LibSQL) with Drizzle ORM
 - **Extension**: Plasmo Framework (Chrome MV3)
@@ -39,3 +39,33 @@ Web app runs at http://localhost:3000. Extension builds in watch mode.
 5. **Manage**: View, filter, favorite, and note properties on the dashboard
 
 Supported platforms: Daft.ie, Kamernet.nl, Idealista, Zonaprop
+
+## Demo account
+
+A demo account is available for sharing and portfolio use:
+
+- Email: `demo@propatlas.com`
+- Password: `demo1234`
+
+To populate it with real listings:
+
+1. Reset the demo user:
+   ```bash
+   bun run db:reset:demo
+   ```
+2. Start the app:
+   ```bash
+   bun run dev
+   ```
+3. Sign in at `http://localhost:3000` with the demo credentials.
+4. Copy the **Browser Extension API Key** from the dashboard.
+5. Configure the extension popup with the API key.
+6. Save real listings from Daft, Idealista, Kamernet, or Zonaprop.
+7. Export the demo data:
+   ```bash
+   bun run db:export:demo
+   ```
+
+From then on, `bun run db:reset:demo` recreates those same real listings. Run steps 2–7 again when listings go stale.
+
+> Demo data is sourced from public listings and may be outdated.
