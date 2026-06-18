@@ -41,9 +41,22 @@ interface Property {
   priceHistory?: Array<{ id: string; price: number; currency: string; recordedAt: Date | string }> | null;
 }
 
+interface MapProperty {
+  id: string;
+  title: string;
+  price: number;
+  currency: string;
+  city?: string | null;
+  listingType: string;
+  url: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  rawPayload?: unknown;
+}
+
 interface DashboardContentProps {
   properties: Property[];
-  allProperties: Property[];
+  allProperties: MapProperty[];
   showDeleted?: boolean;
 }
 

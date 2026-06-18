@@ -7,6 +7,7 @@ import { ZonapropParser } from "./parsers/zonaprop";
 export type { ProviderParser, ParsedProperty, Provider };
 
 export { DaftParser, IdealistaParser, KamernetParser, ZonapropParser };
+export { logger } from "./logger";
 
 export const defaultParsers: ProviderParser[] = [
   new DaftParser(),

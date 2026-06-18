@@ -12,11 +12,15 @@ Extension extracts property data and sends it to the backend API, which stores i
 2. **Backend**: Validates with Zod → authenticates via API key → checks duplicates → stores in Turso
 3. **Frontend**: Dashboard queries saved properties → renders cards and map
 
-## Snapshot Flow (Parser Development)
+## Snapshot Flow (Development-only)
 
-1. **Extension**: Content script builds a semantic HTML map (meta, JSON-LD, DOM nodes, page text) → sends to `/api/snapshots/save`
-2. **Backend**: Authenticates → stores snapshot JSON in `page_snapshots` table
-3. **Frontend**: `/snapshots` page lists captures → expand to inspect structure → copy JSON for LLM analysis
+> Page snapshots are a development aid. They are disabled in production builds and not shown to end users.
+
+When adding or debugging a provider parser, you can capture the raw page structure of a listing:
+
+1. **Extension**: In dev mode, the popup shows an **Analyze Structure** button. The content script builds a semantic HTML map (meta tags, JSON-LD, DOM nodes, page text, images, scripts) and sends it to `/api/snapshots/save`.
+2. **Backend**: Authenticates via API key and stores the snapshot JSON in the `page_snapshots` table.
+3. **Frontend**: In dev mode only, the `/snapshots` page lists captures. Expanding a snapshot shows its structure and lets you copy the JSON for LLM-assisted parser development.
 
 ## Project Structure
 

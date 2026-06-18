@@ -1,5 +1,6 @@
 import type { ProviderParser, ParsedProperty } from "@prop-atlas/types";
 import { Provider, ListingType, PropertyType } from "@prop-atlas/types";
+import { logger } from "../logger";
 
 export class KamernetParser implements ProviderParser {
   readonly name = Provider.KAMERNET;
@@ -101,7 +102,7 @@ export class KamernetParser implements ProviderParser {
         isFurnished,
       };
     } catch (e) {
-      console.error('Failed to parse __NEXT_DATA__:', e);
+      logger.error('Failed to parse __NEXT_DATA__:', e);
       return null;
     }
   }

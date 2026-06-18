@@ -16,6 +16,10 @@ export default async function SnapshotsPage() {
     redirect("/sign-in");
   }
 
+  if (process.env.NODE_ENV !== "development") {
+    redirect("/");
+  }
+
   const db = getDb();
 
   const snapshots = await db

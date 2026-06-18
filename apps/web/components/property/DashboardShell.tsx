@@ -224,12 +224,14 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
               ({total})
             </span>
           </h1>
-          <Link
-            href="/snapshots"
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700"
-          >
-            Page Snapshots
-          </Link>
+          {process.env.NODE_ENV === "development" && (
+            <Link
+              href="/snapshots"
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700"
+            >
+              Page Snapshots
+            </Link>
+          )}
         </div>
 
         <div className="mb-6 flex flex-wrap items-center gap-3">

@@ -5,6 +5,10 @@ import { pageSnapshots } from "@prop-atlas/db";
 import { eq, and } from "@prop-atlas/db";
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const { session, error } = await requireAuth(request);
   if (error) return error;
 

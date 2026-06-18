@@ -1,5 +1,6 @@
 import type { ProviderParser, ParsedProperty } from "@prop-atlas/types";
 import { Provider, ListingType, PropertyType } from "@prop-atlas/types";
+import { logger } from "../logger";
 
 export class ZonapropParser implements ProviderParser {
   readonly name = Provider.ZONAPROP;
@@ -13,9 +14,9 @@ export class ZonapropParser implements ProviderParser {
     const meta = this.extractMeta(document);
     const dom = this.extractFromDom(document);
 
-    console.log("[ZONAPROP] jsonLd:", JSON.stringify(jsonLd));
-    console.log("[ZONAPROP] meta:", JSON.stringify(meta));
-    console.log("[ZONAPROP] dom:", JSON.stringify(dom));
+    logger.log("[ZONAPROP] jsonLd:", JSON.stringify(jsonLd));
+    logger.log("[ZONAPROP] meta:", JSON.stringify(meta));
+    logger.log("[ZONAPROP] dom:", JSON.stringify(dom));
 
     const providerListingId =
       jsonLd?.identifier ||
@@ -24,7 +25,7 @@ export class ZonapropParser implements ProviderParser {
       this.extractIdFromUrl(document.URL);
 
     if (!providerListingId) {
-      console.log("[ZONAPROP] No providerListingId found");
+      logger.log("[ZONAPROP] No providerListingId found");
       return null;
     }
 
@@ -139,24 +140,24 @@ export class ZonapropParser implements ProviderParser {
     // --- Price: innerText preserves spaces between elements, so it's better for
     //     patterns split across tags (e.g. <span>USD</span> <span>59.000</span>).
     const pageText = (document.body as any)?.innerText ?? document.body?.textContent ?? "";
-    console.log("[ZONAPROP] pageText length:", pageText.length, "first 800 chars:", pageText.slice(0, 800));
+    logger.log("[ZONAPROP] pageText length:", pageText.length, "first 800 chars:", pageText.slice(0, 800));
     const priceText = this.findPriceLikeText(pageText);
-    console.log("[ZONAPROP] priceText:", priceText);
+    logger.log("[ZONAPROP] priceText:", priceText);
 
     // --- Expenses (expensas): look for "Expensas" followed by a price-like pattern ---
     const expensesMatch = pageText.match(/Expensas\s*[:\-]?\s*(.+?)(?:\n|$)/i);
-    console.log("[ZONAPROP] expenses raw match:", expensesMatch?.[1] ?? null);
+    logger.log("[ZONAPROP] expenses raw match:", expensesMatch?.[1] ?? null);
     const expensesText = expensesMatch?.[1] ? this.findPriceLikeText(expensesMatch[1]) : undefined;
-    console.log("[ZONAPROP] expensesText:", expensesText);
+    logger.log("[ZONAPROP] expensesText:", expensesText);
     const currencyText = priceText ?? pageText;
 
     // --- Location: Zonaprop shows the address line right after pricing.
     //     Don't trust the DOM city selector — it often returns the big
     //     municipality ("Quilmes") instead of the actual neighborhood ("Bernal").
     const locationLine = this.findLocationLine(pageText);
-    console.log("[ZONAPROP] locationLine:", locationLine);
+    logger.log("[ZONAPROP] locationLine:", locationLine);
     const { address, city } = this.parseZonapropLocation(locationLine);
-    console.log("[ZONAPROP] parsed address:", address, "city:", city);
+    logger.log("[ZONAPROP] parsed address:", address, "city:", city);
 
     // --- Area: scan all text for "46m²" patterns ---
     let areaText: string | undefined;

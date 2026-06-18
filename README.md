@@ -40,6 +40,23 @@ Web app runs at http://localhost:3000. Extension builds in watch mode.
 
 Supported platforms: Daft.ie, Kamernet.nl, Idealista, Zonaprop
 
+## Page Snapshots (development-only)
+
+Page snapshots help during parser development. They capture a listing page’s raw structure (meta tags, JSON-LD, DOM nodes, page text, images, scripts) so you can inspect it while building or debugging a provider parser.
+
+- Available only in `NODE_ENV=development`.
+- Hidden from production builds: the dashboard link, `/snapshots` page, and snapshot API routes are disabled.
+- The extension popup only shows the **Analyze Structure** button in dev builds.
+
+To capture a snapshot:
+
+1. Start the app in dev mode and sign in.
+2. Open the extension popup and click **Analyze Structure** on a supported listing page.
+3. Visit `/snapshots` in the web app to inspect the captured structure.
+4. Copy the JSON to feed to an LLM or use it directly to understand the provider’s HTML layout.
+
+Snapshots are stored per-user in the `page_snapshots` table and can be deleted from the `/snapshots` page.
+
 ## Demo account
 
 A demo account is available for sharing and portfolio use:

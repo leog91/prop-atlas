@@ -24,6 +24,10 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const origin = request.headers.get("origin");
   const { session, error } = await requireAuth(request);
   if (error) {

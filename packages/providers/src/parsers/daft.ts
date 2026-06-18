@@ -1,5 +1,6 @@
 import type { ProviderParser, ParsedProperty } from "@prop-atlas/types";
 import { Provider, ListingType, PropertyType } from "@prop-atlas/types";
+import { logger } from "../logger";
 
 export class DaftParser implements ProviderParser {
   readonly name = Provider.DAFT;
@@ -109,7 +110,7 @@ export class DaftParser implements ProviderParser {
         isFurnished: listing.isFurnished ?? listing.furnished,
       };
     } catch (e) {
-      console.error('[DAFT] Failed to parse __NEXT_DATA__:', e);
+      logger.error('[DAFT] Failed to parse __NEXT_DATA__:', e);
       return null;
     }
   }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { logger } from "@prop-atlas/providers";
 
 type Status = "idle" | "detecting" | "saving" | "saved" | "analyzing" | "analyzed" | "error";
 
@@ -31,19 +32,19 @@ function IndexPopup() {
   const handleSave = async () => {
     setErrorMsg("");
     setStatus("detecting");
-    console.log("[EXT POPUP] handleSave started");
+    logger.log("[EXT POPUP] handleSave started");
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      console.log("[EXT POPUP] active tab:", tab?.url);
+      logger.log("[EXT POPUP] active tab:", tab?.url);
       if (!tab?.id) throw new Error("No active tab");
 
       let results;
       try {
-        console.log("[EXT POPUP] sending PARSE_LISTING to tab", tab.id);
+        logger.log("[EXT POPUP] sending PARSE_LISTING to tab", tab.id);
         results = await chrome.tabs.sendMessage(tab.id, { type: "PARSE_LISTING" });
-        console.log("[EXT POPUP] results from content script:", JSON.stringify(results, null, 2));
+        logger.log("[EXT POPUP] results from content script:", JSON.stringify(results, null, 2));
       } catch (e) {
-        console.error("[EXT POPUP] sendMessage failed:", e);
+        logger.error("[EXT POPUP] sendMessage failed:", e);
         throw new Error("Content script not loaded. Refresh the page and try again.");
       }
 
@@ -77,7 +78,7 @@ function IndexPopup() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        console.log("[EXT POPUP] server error response:", JSON.stringify(data, null, 2));
+        logger.log("[EXT POPUP] server error response:", JSON.stringify(data, null, 2));
         if (data?.details?.fieldErrors) {
           const errors = Object.entries(data.details.fieldErrors)
             .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)
@@ -97,19 +98,19 @@ function IndexPopup() {
   const handleAnalyze = async () => {
     setErrorMsg("");
     setStatus("analyzing");
-    console.log("[EXT POPUP] handleAnalyze started");
+    logger.log("[EXT POPUP] handleAnalyze started");
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      console.log("[EXT POPUP] active tab:", tab?.url);
+      logger.log("[EXT POPUP] active tab:", tab?.url);
       if (!tab?.id) throw new Error("No active tab");
 
       let results;
       try {
-        console.log("[EXT POPUP] sending ANALYZE_STRUCTURE to tab", tab.id);
+        logger.log("[EXT POPUP] sending ANALYZE_STRUCTURE to tab", tab.id);
         results = await chrome.tabs.sendMessage(tab.id, { type: "ANALYZE_STRUCTURE" });
-        console.log("[EXT POPUP] results from content script:", JSON.stringify(results, null, 2));
+        logger.log("[EXT POPUP] results from content script:", JSON.stringify(results, null, 2));
       } catch (e) {
-        console.error("[EXT POPUP] sendMessage failed:", e);
+        logger.error("[EXT POPUP] sendMessage failed:", e);
         throw new Error("Content script not loaded. Refresh the page and try again.");
       }
 
@@ -148,12 +149,12 @@ function IndexPopup() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        console.log("[EXT POPUP] server error response:", JSON.stringify(data, null, 2));
+        logger.log("[EXT POPUP] server error response:", JSON.stringify(data, null, 2));
         throw new Error(data?.error || `Server error (${response.status})`);
       }
 
       const data = await response.json();
-      console.log("[EXT POPUP] snapshot saved:", data.id);
+      logger.log("[EXT POPUP] snapshot saved:", data.id);
       setStatus("analyzed");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Unknown error");
@@ -253,22 +254,24 @@ function IndexPopup() {
           >
             Save Property
           </button>
-          <button
-            onClick={handleAnalyze}
-            style={{
-              width: "100%",
-              padding: "10px 16px",
-              background: "#f3f4f6",
-              color: "#374151",
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 500,
-            }}
-          >
-            Analyze Structure
-          </button>
+          {process.env.NODE_ENV === "development" && (
+            <button
+              onClick={handleAnalyze}
+              style={{
+                width: "100%",
+                padding: "10px 16px",
+                background: "#f3f4f6",
+                color: "#374151",
+                border: "1px solid #d1d5db",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              Analyze Structure
+            </button>
+          )}
         </div>
       )}
 
