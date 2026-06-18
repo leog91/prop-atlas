@@ -43,15 +43,18 @@ interface Property {
 
 interface DashboardContentProps {
   properties: Property[];
+  allProperties: Property[];
   showDeleted?: boolean;
 }
 
-export function DashboardContent({ properties, showDeleted }: DashboardContentProps) {
+export function DashboardContent({ properties, allProperties, showDeleted }: DashboardContentProps) {
   const [view, setView] = useState<"list" | "map">("list");
   const [items, setItems] = useState(properties);
+  const [mapItems, setMapItems] = useState(allProperties);
 
   const handleRemove = (id: string) => {
     setItems((prev) => prev.filter((p) => p.id !== id));
+    setMapItems((prev) => prev.filter((p) => p.id !== id));
   };
 
   return (
@@ -92,7 +95,7 @@ export function DashboardContent({ properties, showDeleted }: DashboardContentPr
         </div>
       ) : (
         <MapView
-          properties={items.map((p) => ({
+          properties={mapItems.map((p) => ({
             id: p.id,
             title: p.title,
             price: p.price,

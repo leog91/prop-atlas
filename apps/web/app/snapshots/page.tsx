@@ -57,7 +57,7 @@ export default async function SnapshotsPage() {
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Page Snapshots</h1>
           <Link
-            href="/dashboard"
+            href="/"
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700"
           >
             Back to Dashboard

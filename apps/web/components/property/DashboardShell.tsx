@@ -2,24 +2,24 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { eq, and, desc, inArray, like, sql, isNull, isNotNull } from "@prop-atlas/db";
-import { properties, propertyImages, savedProperties, propertyPriceHistory } from "@prop-atlas/db";
+import { properties, savedProperties, propertyImages, propertyPriceHistory } from "@prop-atlas/db";
 import { getDb } from "@/lib/db";
 import { DashboardContent } from "@/components/property/DashboardContent";
 import { ApiKeyManager } from "@/components/ApiKeyManager";
 import Link from "next/link";
 
-interface DashboardPageProps {
-  searchParams: Promise<{
+interface DashboardShellProps {
+  searchParams: {
     page?: string;
     favorites?: string;
     search?: string;
     listingType?: string;
     provider?: string;
     deleted?: string;
-  }>;
+  };
 }
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+export async function DashboardShell({ searchParams }: DashboardShellProps) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -28,7 +28,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect("/sign-in");
   }
 
-  const params = await searchParams;
+  const params = searchParams;
   const page = Math.max(1, parseInt(params.page || "1"));
   const limit = 12;
   const offset = (page - 1) * limit;
@@ -84,6 +84,40 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const total = countResult[0]?.count || 0;
   const totalPages = Math.ceil(total / limit);
 
+  const allResults = await db
+    .select({
+      property: {
+        id: properties.id,
+        title: properties.title,
+        price: properties.price,
+        currency: properties.currency,
+        latitude: properties.latitude,
+        longitude: properties.longitude,
+        city: properties.city,
+        listingType: properties.listingType,
+        url: properties.url,
+        rawPayload: properties.rawPayload,
+      },
+      saved: savedProperties,
+    })
+    .from(savedProperties)
+    .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
+    .where(and(...conditions, ...propertyConditions))
+    .orderBy(desc(savedProperties.savedAt));
+
+  const mapData = allResults.map(({ property }) => ({
+    id: property.id,
+    title: property.title,
+    price: property.price,
+    currency: property.currency,
+    latitude: property.latitude,
+    longitude: property.longitude,
+    city: property.city,
+    listingType: property.listingType,
+    url: property.url,
+    rawPayload: property.rawPayload,
+  }));
+
   const propertyIds = results.map((r) => r.property.id);
   const images = propertyIds.length
     ? await db
@@ -120,7 +154,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((i) => i.url),
     priceHistory: (priceHistoryByProperty.get(property.id) || [])
-      .map(p => ({
+      .map((p) => ({
         id: p.id,
         price: p.price,
         currency: p.currency,
@@ -146,7 +180,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     for (const [k, v] of Object.entries(merged)) {
       if (v) p.set(k, v);
     }
-    return `/dashboard?${p.toString()}`;
+    return `/?${p.toString()}`;
   };
 
   return (
@@ -169,7 +203,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             >
               <button
                 type="submit"
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
               >
                 Sign out
               </button>
@@ -199,7 +233,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         <div className="mb-6 flex flex-wrap items-center gap-3">
-          <form action="/dashboard" method="GET" className="flex gap-2">
+          <form action="/" method="GET" className="flex gap-2">
             {favoritesOnly && <input type="hidden" name="favorites" value="true" />}
             {showDeleted && <input type="hidden" name="deleted" value="true" />}
             {listingType && <input type="hidden" name="listingType" value={listingType} />}
@@ -213,7 +247,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             />
             <button
               type="submit"
-              className="rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white dark:bg-gray-100 dark:text-gray-900"
+              className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white dark:bg-gray-100 dark:text-gray-900"
             >
               Search
             </button>
@@ -284,6 +318,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <DashboardContent
               key={data.map((d) => d.id).join(",")}
               properties={data}
+              allProperties={mapData}
               showDeleted={showDeleted}
             />
 

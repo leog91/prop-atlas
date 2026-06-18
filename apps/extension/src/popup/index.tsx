@@ -169,7 +169,7 @@ function IndexPopup() {
           Get your API key from the dashboard:
         </p>
         <a
-          href={`${apiUrl}/dashboard`}
+          href={`${apiUrl}/`}
           target="_blank"
           rel="noopener noreferrer"
           style={{
