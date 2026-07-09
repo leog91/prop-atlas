@@ -95,13 +95,13 @@ export class DaftParser implements ProviderParser {
         description: listing.description ?? listing.metaDescription,
         price: this.parsePrice(listing.price ?? listing.monthlyRent ?? listing.rent),
         propertyType: listing.propertyType ?? listing.type ?? listing.category,
-        bedrooms: listing.bedrooms ?? listing.beds ?? listing.numberOfBedrooms ?? this.extractBedrooms(listing.description),
-        bathrooms: listing.bathrooms ?? listing.baths ?? listing.numberOfBathrooms,
+        bedrooms: listing.bedrooms ?? listing.beds ?? listing.numBedrooms ?? listing.numberOfBedrooms ?? this.extractBedrooms(listing.description),
+        bathrooms: listing.bathrooms ?? listing.baths ?? listing.numBathrooms ?? listing.numberOfBathrooms,
         area: this.parseArea(listing.floorArea ?? listing.area ?? listing.squareFeet ?? listing.size),
         address: listing.displayAddress ?? listing.address ?? this.formatAddress(listing.location ?? listing.address),
         city: listing.town ?? listing.city ?? listing.addressLocality,
-        latitude: listing.latitude ?? listing.lat ?? listing.geo?.latitude,
-        longitude: listing.longitude ?? listing.lng ?? listing.lon ?? listing.geo?.longitude,
+        latitude: listing.latitude ?? listing.lat ?? listing.geo?.latitude ?? listing.point?.coordinates?.[1],
+        longitude: listing.longitude ?? listing.lng ?? listing.lon ?? listing.geo?.longitude ?? listing.point?.coordinates?.[0],
         images: foundImages.length > 0 ? foundImages : undefined,
         deposit: this.parsePrice(listing.deposit ?? listing.securityDeposit),
         floor: listing.floor ?? listing.floorNumber,
@@ -157,6 +157,11 @@ export class DaftParser implements ProviderParser {
         return;
       }
       for (const [key, val] of Object.entries(current)) {
+        if (isImageUrl(val)) {
+          addUrl(val);
+          continue;
+        }
+
         const lowerKey = key.toLowerCase();
         if (
           lowerKey === "image" ||

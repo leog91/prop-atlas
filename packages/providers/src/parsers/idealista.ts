@@ -12,18 +12,20 @@ export class IdealistaParser implements ProviderParser {
     const jsonLd = this.extractJsonLd(document);
     const meta = this.extractMeta(document);
     const dom = this.extractFromDom(document);
+    const scriptData = this.extractScriptData(document);
 
     const providerListingId =
       jsonLd?.identifier ||
       meta.listingId ||
       dom.listingId ||
+      scriptData.listingId ||
       this.extractIdFromUrl(document.URL);
 
     if (!providerListingId) return null;
 
     const listingType = this.detectListingType(document.URL);
     const price = jsonLd?.price ?? meta.price ?? dom.price;
-    const title = jsonLd?.name ?? meta.title ?? dom.title ?? "";
+    const title = jsonLd?.name ?? dom.title ?? meta.title ?? "";
     const images = this.collectImages([
       jsonLd?.images,
       meta.images,
@@ -54,8 +56,8 @@ export class IdealistaParser implements ProviderParser {
       city: location.city ?? dom.city,
       country,
       postalCode: location.postalCode ?? dom.postalCode,
-      latitude: jsonLd?.latitude ?? meta.latitude ?? coords.latitude,
-      longitude: jsonLd?.longitude ?? meta.longitude ?? coords.longitude,
+      latitude: jsonLd?.latitude ?? meta.latitude ?? coords.latitude ?? scriptData.latitude,
+      longitude: jsonLd?.longitude ?? meta.longitude ?? coords.longitude ?? scriptData.longitude,
       images,
       url: document.URL,
       listedAt: listingDate?.isoDate,
@@ -67,6 +69,7 @@ export class IdealistaParser implements ProviderParser {
         jsonLd,
         meta,
         dom,
+        scriptData,
         idealistaUpdatedAtText: listingDate?.sourceText,
         isApproximateLocation: location.isApproximate,
         locationPrecision: location.isApproximate ? "approximate" : "exact",
@@ -74,6 +77,23 @@ export class IdealistaParser implements ProviderParser {
         locationParts: location.parts,
         geocodeQueries: this.buildGeocodeQueries(location, country),
       },
+    };
+  }
+
+  private extractScriptData(document: Document) {
+    const scriptText = Array.from(document.querySelectorAll("script"))
+      .map((script) => script.textContent || "")
+      .join("\n");
+
+    const listingId = scriptText.match(/adId:\s*(\d+)/)?.[1];
+    const mapCenter = scriptText.match(/staticmap\?[^"']*center=([\d.-]+)%2C([\d.-]+)/);
+    const latitude = mapCenter ? parseFloat(mapCenter[1]) : undefined;
+    const longitude = mapCenter ? parseFloat(mapCenter[2]) : undefined;
+
+    return {
+      listingId,
+      latitude: Number.isFinite(latitude) ? latitude : undefined,
+      longitude: Number.isFinite(longitude) ? longitude : undefined,
     };
   }
 
@@ -144,9 +164,17 @@ export class IdealistaParser implements ProviderParser {
     // Parse floor, elevator, parking from info-features
     const infoFeaturesText = text(".info-features") || "";
     const floorMatch = infoFeaturesText.match(/(\d+ª?\s*(?:planta|piso|floor))/i);
-    const hasElevator = /(?:ascensor|elevator|lift)/i.test(infoFeaturesText);
+    const hasElevator = /(?:sin\s+ascensor|no\s+elevator|without\s+(?:an\s+)?elevator|without\s+lift)/i.test(featuresText)
+      ? false
+      : /(?:ascensor|elevator|lift)/i.test(infoFeaturesText)
+        ? true
+        : undefined;
     const hasParking = /(?:garaje|parking|plaza\s+de\s+aparcamiento)/i.test(infoFeaturesText);
-    const isFurnished = /(?:amueblado|furnished)/i.test(featuresText);
+    const isFurnished = /(?:sin\s+amueblar|unfurnished)/i.test(featuresText)
+      ? false
+      : /(?:amueblado|furnished)/i.test(featuresText)
+        ? true
+        : undefined;
 
     const location = this.extractLocation(document);
 
@@ -156,15 +184,15 @@ export class IdealistaParser implements ProviderParser {
       price: this.parsePrice(priceText),
       bedrooms: this.extractBedrooms(featuresText) ?? this.extractFromInfoData(document, "rooms"),
       bathrooms: this.extractBathrooms(featuresText) ?? this.extractFromInfoData(document, "bathrooms"),
-      area: this.parseArea(text("[class*='area']") || text(".info-data-feature")),
+      area: this.parseArea(text(".info-features") || text("[class*='area']") || text(".info-data-feature")),
       propertyType: text("[class*='property-type']") || text(".detail-type") || text("strong.typology"),
       address: location.address,
       city: location.city ?? text(".detail-location-city"),
       postalCode: location.postalCode ?? text("[class*='postal-code']"),
       floor: floorMatch ? floorMatch[1] : undefined,
-      hasElevator: hasElevator || undefined,
+      hasElevator,
       hasParking: hasParking || undefined,
-      isFurnished: isFurnished || undefined,
+      isFurnished,
       listingId: attr('[data-listing-id]', "data-listing-id") || attr('[data-element-id]', "data-element-id"),
       images,
     };
@@ -428,9 +456,9 @@ export class IdealistaParser implements ProviderParser {
       addUrl(match?.[1]);
     }
 
-    for (const script of document.querySelectorAll('script[type="application/json"], script[id*="data"]')) {
+    for (const script of document.querySelectorAll('script[type="application/json"], script[id*="data"], script:not([src])')) {
       const text = script.textContent || "";
-      const urls = text.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      const urls = text.match(/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)(?:\?[^\s"'<>]*)?/gi) || [];
       for (const u of urls) addUrl(u);
     }
 

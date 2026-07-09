@@ -52,3 +52,5 @@ packages/db/drizzle/
 apps/extension/build/
 apps/extension/.plasmo/
 packages/db/local.db
+
+.temp

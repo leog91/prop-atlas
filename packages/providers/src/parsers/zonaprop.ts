@@ -13,6 +13,7 @@ export class ZonapropParser implements ProviderParser {
     const jsonLd = this.extractJsonLd(document);
     const meta = this.extractMeta(document);
     const dom = this.extractFromDom(document);
+    const scriptData = this.extractScriptData(document);
 
     logger.log("[ZONAPROP] jsonLd:", JSON.stringify(jsonLd));
     logger.log("[ZONAPROP] meta:", JSON.stringify(meta));
@@ -22,6 +23,7 @@ export class ZonapropParser implements ProviderParser {
       jsonLd?.identifier ||
       meta.listingId ||
       dom.listingId ||
+      scriptData.listingId ||
       this.extractIdFromUrl(document.URL);
 
     if (!providerListingId) {
@@ -64,8 +66,8 @@ export class ZonapropParser implements ProviderParser {
       address: jsonLd?.address ?? dom.address,
       city: dom.city,
       country: "Argentina",
-      latitude: jsonLd?.latitude ?? meta.latitude,
-      longitude: jsonLd?.longitude ?? meta.longitude,
+      latitude: jsonLd?.latitude ?? meta.latitude ?? scriptData.latitude,
+      longitude: jsonLd?.longitude ?? meta.longitude ?? scriptData.longitude,
       images,
       url: document.URL,
       listedAt: dom.listedAt,
@@ -73,8 +75,20 @@ export class ZonapropParser implements ProviderParser {
       hasElevator: dom.hasElevator,
       hasParking: dom.hasParking,
       isFurnished: dom.isFurnished,
-      rawPayload: { jsonLd, meta, dom, locationLine: dom.locationLine },
+      rawPayload: { jsonLd, meta, dom, scriptData, locationLine: dom.locationLine },
     };
+  }
+
+  private extractScriptData(document: Document) {
+    const scriptText = Array.from(document.querySelectorAll("script"))
+      .map((script) => script.textContent || "")
+      .join("\n");
+
+    const listingId = scriptText.match(/postingId\s*=\s*["'](\d+)["']/)?.[1];
+    const latitude = this.decodeBase64Number(scriptText.match(/mapLatOf\s*=\s*["']([^"']+)["']/)?.[1]);
+    const longitude = this.decodeBase64Number(scriptText.match(/mapLngOf\s*=\s*["']([^"']+)["']/)?.[1]);
+
+    return { listingId, latitude, longitude };
   }
 
   private extractJsonLd(document: Document): Record<string, any> | null {
@@ -181,7 +195,7 @@ export class ZonapropParser implements ProviderParser {
 
     return {
       title: titleText || "",
-      description: text("[class*='description']"),
+      description: text('[data-qa="section-description-property"]') || text("[class*='description']"),
       price: this.parsePrice(priceText),
       currency: this.parseCurrency(currencyText),
       expenses: this.parsePrice(expensesText),
@@ -377,6 +391,20 @@ export class ZonapropParser implements ProviderParser {
     if (typeof value === "number") return value;
     const match = value.replace(/[^\d.]/g, "").match(/[\d.]+/);
     return match ? parseFloat(match[0]) : undefined;
+  }
+
+  private decodeBase64Number(value?: string): number | undefined {
+    if (!value) return undefined;
+
+    try {
+      const decoded = typeof atob === "function"
+        ? atob(value)
+        : Buffer.from(value, "base64").toString("utf8");
+      const parsed = parseFloat(decoded);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private extractBedrooms(text?: string | null): number | undefined {
