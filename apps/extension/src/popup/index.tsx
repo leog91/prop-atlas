@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { logger } from "@prop-atlas/providers";
+
+const isDevelopment = process.env.NODE_ENV === "development";
+
+const logger = {
+  log: (...args: unknown[]) => {
+    if (isDevelopment) {
+      console.log(...args);
+    }
+  },
+  error: (...args: unknown[]) => {
+    console.error(...args);
+  },
+};
 
 type Status = "idle" | "detecting" | "saving" | "saved" | "analyzing" | "analyzed" | "error";
 
