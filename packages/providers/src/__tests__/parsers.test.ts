@@ -98,6 +98,99 @@ describe("KamernetParser", () => {
     expect(result?.isFurnished).toBe(true);
     expect(result?.images).toContain("https://resources.kamernet.nl/image/kamernet-img-abc");
   });
+
+  it("should parse current Kamernet listing details shape", () => {
+    const parser = new KamernetParser();
+    const html = `
+      <html>
+        <body>
+          <script id="__NEXT_DATA__" type="application/json">
+            {
+              "props": {
+                "pageProps": {
+                  "targetPageProps": {
+                    "listingDetails": {
+                      "listingId": 2391417,
+                      "englishTitle": "Safe Cozy StudentRoom Amsterdam",
+                      "englishDescription": "Looking for a safe, quiet student room.",
+                      "listingTypeId": 1,
+                      "numOfBedrooms": 2,
+                      "computedCityName": "Amsterdam",
+                      "computedStreetName": "Fleerde",
+                      "surfaceArea": 110,
+                      "imageList": ["d21b2edb-d176-4af9-b7ef-cac6f85db04b"],
+                      "postalCode": "1102AV",
+                      "postalCodeLat": 52.317673,
+                      "postalCodeLong": 4.955051,
+                      "totalRentalPrice": 1700,
+                      "deposit": 2000,
+                      "furnishingId": 4,
+                      "publishDate": "2026-07-09T18:48:07.853"
+                    }
+                  }
+                }
+              }
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    const dom = new JSDOM(html, { url: "https://kamernet.nl/en/for-rent/room-amsterdam/fleerde/room-2391417" });
+    const result = parser.parse(dom.window.document);
+    expect(result).not.toBeNull();
+    expect(result?.providerListingId).toBe("2391417");
+    expect(result?.title).toBe("Safe Cozy StudentRoom Amsterdam");
+    expect(result?.price).toBe(1700);
+    expect(result?.bedrooms).toBe(2);
+    expect(result?.area).toBe(110);
+    expect(result?.address).toBe("Fleerde, Amsterdam");
+    expect(result?.postalCode).toBe("1102AV");
+    expect(result?.deposit).toBe(2000);
+    expect(result?.isFurnished).toBe(true);
+    expect(result?.images).toContain("https://resources.kamernet.nl/image/d21b2edb-d176-4af9-b7ef-cac6f85db04b");
+  });
+
+  it("should parse matching listing from Kamernet search payload when URL includes listing id", () => {
+    const parser = new KamernetParser();
+    const html = `
+      <html>
+        <body>
+          <script id="__NEXT_DATA__" type="application/json">
+            {
+              "props": {
+                "pageProps": {
+                  "targetPageProps": {
+                    "findListingsResponse": {
+                      "listings": [
+                        {
+                          "listingId": 2391417,
+                          "street": "Fleerde",
+                          "city": "Amsterdam",
+                          "surfaceArea": 110,
+                          "listingType": 1,
+                          "totalRentalPrice": 1700,
+                          "resizedFullPreviewImageUrl": "https://resources.kamernet.nl/image/d21b2edb-d176-4af9-b7ef-cac6f85db04b/resize/422-225"
+                        }
+                      ],
+                      "topAdListings": []
+                    }
+                  }
+                }
+              }
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    const dom = new JSDOM(html, { url: "https://kamernet.nl/en/for-rent/room-amsterdam/fleerde/room-2391417" });
+    const result = parser.parse(dom.window.document);
+    expect(result).not.toBeNull();
+    expect(result?.providerListingId).toBe("2391417");
+    expect(result?.title).toBe("Room for rent in Fleerde, Amsterdam");
+    expect(result?.price).toBe(1700);
+    expect(result?.area).toBe(110);
+    expect(result?.images).toContain("https://resources.kamernet.nl/image/d21b2edb-d176-4af9-b7ef-cac6f85db04b/resize/422-225");
+  });
 });
 
 describe("IdealistaParser", () => {

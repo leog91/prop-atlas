@@ -16,6 +16,7 @@
     "@prop-atlas/types": "workspace:*"
   },
   "devDependencies": {
+    "@types/jsdom": "^28.0.3",
     "@types/node": "^20",
     "jsdom": "^29.1.1",
     "typescript": "^5",

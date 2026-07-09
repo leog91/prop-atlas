@@ -29,16 +29,17 @@ export class KamernetParser implements ProviderParser {
       providerListingId,
       listingType: ListingType.RENT,
       title: nextData?.title ?? jsonLd?.name ?? meta.title ?? dom.title ?? "",
-      description: nextData?.description ?? jsonLd?.description ?? dom.description,
+      description: nextData?.description ?? jsonLd?.description ?? meta.description ?? dom.description,
       price: nextData?.price ?? jsonLd?.price ?? meta.price ?? dom.price,
       currency: "EUR",
       propertyType: nextData?.propertyType ?? this.mapPropertyType(jsonLd?.propertyType ?? dom.propertyType),
-      bedrooms: jsonLd?.bedrooms ?? dom.bedrooms,
+      bedrooms: nextData?.bedrooms ?? jsonLd?.bedrooms ?? dom.bedrooms,
       area: nextData?.area ?? jsonLd?.area ?? dom.area,
       areaUnit: "m²",
       address: nextData?.address ?? jsonLd?.address ?? dom.address,
       city: nextData?.city ?? dom.city,
       country: "Netherlands",
+      postalCode: nextData?.postalCode,
       latitude: nextData?.latitude ?? jsonLd?.latitude ?? meta.latitude,
       longitude: nextData?.longitude ?? jsonLd?.longitude ?? meta.longitude,
       images: this.collectImages([
@@ -62,39 +63,40 @@ export class KamernetParser implements ProviderParser {
 
     try {
       const data = JSON.parse(script.textContent);
-      const listing = data?.props?.pageProps?.targetPageProps?.listingDetails;
+      const targetPageProps = data?.props?.pageProps?.targetPageProps;
+      const listing = targetPageProps?.listingDetails ?? this.findListingFromSearchPayload(targetPageProps, document.URL);
       if (!listing) return null;
 
       const title = listing.dutchTitle || listing.englishTitle;
       const description = listing.dutchDescription || listing.englishDescription;
-      const price = listing.rentalPrice;
+      const price = listing.totalRentalPrice ?? listing.rentalPrice;
       const area = listing.surfaceArea;
-      const city = listing.computedCityName;
-      const street = listing.computedStreetName;
+      const city = listing.computedCityName ?? listing.city;
+      const street = listing.computedStreetName ?? listing.street;
       const address = street && city ? `${street}, ${city}` : city;
       
-      const imageIds = listing.imageList || [];
-      const images = imageIds.map((id: string) => 
-        `https://resources.kamernet.nl/image/${id}`
-      );
+      const images = this.extractNextImages(listing);
 
-      const propertyType = this.mapListingTypeId(listing.listingTypeId);
+      const propertyType = this.mapListingTypeId(listing.listingTypeId ?? listing.listingType);
       const latitude = listing.postalCodeLat;
       const longitude = listing.postalCodeLong;
       const listedAt = listing.publishDate;
       const deposit = listing.deposit;
-      const isFurnished = listing.isFurnished;
+      const isFurnished = listing.isFurnished ?? this.mapFurnishingId(listing.furnishingId);
+      const bedrooms = listing.numOfBedrooms ?? listing.numOfRooms;
 
       return {
         listingId: String(listing.listingId),
-        title,
+        title: title ?? this.buildSearchListingTitle(listing),
         description,
         price,
         area,
         city,
         address,
+        postalCode: listing.postalCode,
         images,
         propertyType,
+        bedrooms,
         latitude,
         longitude,
         listedAt,
@@ -105,6 +107,46 @@ export class KamernetParser implements ProviderParser {
       logger.error('Failed to parse __NEXT_DATA__:', e);
       return null;
     }
+  }
+
+  private findListingFromSearchPayload(targetPageProps: any, url: string): Record<string, any> | null {
+    const listingId = targetPageProps?.routeParams?.listingID ?? this.extractIdFromUrl(url);
+    if (!listingId) return null;
+
+    const response = targetPageProps?.findListingsResponse;
+    const listings = [
+      ...(response?.listings ?? []),
+      ...(response?.topAdListings ?? []),
+      ...(response?.nearbyListings ?? []),
+    ];
+
+    return listings.find((listing) => String(listing.listingId) === String(listingId)) ?? null;
+  }
+
+  private extractNextImages(listing: Record<string, any>): string[] {
+    const imageIds = listing.imageList || [];
+    const images = imageIds.map((id: string) =>
+      id.startsWith("http") ? id : `https://resources.kamernet.nl/image/${id}`
+    );
+
+    return this.collectImages([
+      images,
+      listing.fullPreviewImageUrl,
+      listing.resizedFullPreviewImageUrl,
+      listing.thumbnailUrl,
+    ]);
+  }
+
+  private buildSearchListingTitle(listing: Record<string, any>): string | undefined {
+    if (!listing.street && !listing.city) return undefined;
+    const propertyType = this.mapListingTypeId(listing.listingTypeId ?? listing.listingType);
+    const typeLabel = propertyType === PropertyType.OTHER ? "Property" : propertyType[0].toUpperCase() + propertyType.slice(1);
+    return `${typeLabel} for rent in ${[listing.street, listing.city].filter(Boolean).join(", ")}`;
+  }
+
+  private mapFurnishingId(furnishingId?: number | null): boolean | undefined {
+    // Current Kamernet detail pages use 4 for furnished listings.
+    return furnishingId === 4 ? true : undefined;
   }
 
   private mapListingTypeId(typeId: number): PropertyType {
@@ -156,6 +198,7 @@ export class KamernetParser implements ProviderParser {
 
     return {
       title: getMeta("og:title") || getMeta("twitter:title"),
+      description: getMeta("description"),
       price: this.parsePrice(getMeta("product:price:amount")),
       images: this.normalizeImages(getMeta("og:image")),
       listingId: this.extractIdFromMeta(getMeta("og:url")),
@@ -193,7 +236,7 @@ export class KamernetParser implements ProviderParser {
 
     return {
       title: titleText || "",
-      description: text("[class*='description']"),
+      description: text(".About_preText__pYF_E") || text("[class*='description']"),
       price: this.parsePrice(priceText),
       bedrooms: this.extractBedrooms(text("[class*='room']") || text("[class*='bed']")),
       area: this.parseArea(text("[class*='area']") || text("[class*='size']") || text(".PropertyDetails_row___QmRn")),
@@ -320,7 +363,7 @@ export class KamernetParser implements ProviderParser {
   }
 
   private extractIdFromUrl(url: string): string {
-    const match = url.match(/\/(\d+)(?:\?|$|#)/);
+    const match = url.match(/(?:\/|-)(\d+)(?:\?|$|#)/);
     return match ? match[1] : url.split("/").pop() || "";
   }
 

@@ -25,6 +25,8 @@ dist/
 # misc
 .DS_Store
 *.pem
+.playwright-mcp/
+opencode.json
 
 # debug
 npm-debug.log*
