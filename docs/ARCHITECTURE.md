@@ -40,4 +40,4 @@ packages/
 - React: functional components, server components by default, `"use client"` for client components
 - Database: Drizzle ORM only, index foreign keys, validate inputs with Zod
 - Auth: Better Auth (web sessions), API keys (extension Bearer tokens)
-- Images: plain `<img>` with `loading="lazy"`
+- Images: plain `<img>` elements use native lazy loading; external listing hosts need no Next.js image configuration

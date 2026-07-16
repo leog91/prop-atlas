@@ -1,4 +1,6 @@
-# Prop Atlas — Home/Auth/Demo Redesign Spec
+# Prop Atlas — Home/Auth/Demo Redesign Spec (Completed)
+
+> Historical implementation plan. The work below was completed; retain this document as a record of the redesign.
 
 ## Overview
 Move the dashboard to the root route (`/`) and turn the logged-out experience into a useful sign-in/landing page with a demo account. Remove the standalone `/dashboard` route.
@@ -99,14 +101,14 @@ Move the dashboard to the root route (`/`) and turn the logged-out experience in
 7. When listings go stale, repeat steps 2–5.
 
 ## Acceptance Criteria
-- [ ] `/` shows the dashboard when logged in.
-- [ ] `/` shows the enhanced sign-in page when logged out.
-- [ ] `/dashboard` no longer exists or redirects to `/`.
-- [ ] Demo credentials pre-fill the sign-in form.
-- [ ] Demo user can sign in and see seeded properties.
-- [ ] Re-seed script successfully resets demo data.
-- [ ] `bun run lint` passes.
-- [ ] Dark mode classes are applied to new UI.
+- [x] `/` shows the dashboard when logged in.
+- [x] `/` shows the enhanced sign-in page when logged out.
+- [x] `/dashboard` no longer exists or redirects to `/`.
+- [x] Demo credentials pre-fill the sign-in form.
+- [x] Demo user can sign in and see seeded properties.
+- [x] Re-seed script successfully resets demo data.
+- [x] `bun run lint` passes.
+- [x] Dark mode classes are applied to new UI.
 
 ## Notes for Next AI/Developer
 - Do not change auth schema or session logic.

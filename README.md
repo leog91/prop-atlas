@@ -17,7 +17,7 @@ Prerequisites: Node.js 18+, Bun, Chrome
 ```bash
 bun install
 
-# Setup env
+# Setup app-specific environment files
 cp apps/web/.env.example apps/web/.env
 cp apps/extension/.env.example apps/extension/.env
 

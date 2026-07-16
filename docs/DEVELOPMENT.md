@@ -24,8 +24,7 @@ bun run typecheck # Type-check all
 2. Register in `packages/providers/src/index.ts`
 3. Add host permissions in `apps/extension/package.json`
 4. Update `apps/extension/scripts/postbuild.js` content script matches
-5. Update `apps/web/next.config.ts` image domains
-6. Rebuild and test
+5. Rebuild and test
 
 ## Using Page Snapshots for Parser Development
 

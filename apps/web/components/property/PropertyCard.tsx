@@ -365,6 +365,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
           <img
             src={currentImage}
             alt={property.title}
+            loading="lazy"
             referrerPolicy="no-referrer"
             onClick={() => setLightboxOpen(true)}
             className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 cursor-pointer ${showDeleted ? "grayscale opacity-60" : ""}`}
