@@ -11,7 +11,8 @@
     "clean": "rm -rf .next .turbo",
     "db:seed:demo": "bun run scripts/seed-demo.ts",
     "db:reset:demo": "bun run scripts/reset-demo.ts",
-    "db:export:demo": "bun run scripts/export-demo.ts"
+    "db:export:demo": "bun run scripts/export-demo.ts",
+    "db:import:local": "bun run scripts/import-local-data.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.11",

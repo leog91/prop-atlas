@@ -13,6 +13,7 @@ cd packages/db && bun run push
 
 ```bash
 bun run dev       # Start web + extension
+bun run dev-local-db # Start web + extension with local SQLite data
 bun run build     # Build all
 bun run lint      # Lint all
 bun run typecheck # Type-check all
