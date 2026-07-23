@@ -40,6 +40,8 @@ Web app runs at http://localhost:3000. Extension builds in watch mode.
 
 Supported platforms: Daft.ie, Kamernet.nl, Idealista, Zonaprop
 
+See [deployment instructions](docs/DEPLOYMENT.md) for Turso migrations, Vercel configuration, extension release, and privacy considerations.
+
 ### Extension API access
 
 Chrome requires explicit permission for every API origin used by an extension. Local development is preconfigured for `http://localhost:3000`. Before a production build, add the deployed API origin to `apps/extension/package.json` under `manifest.host_permissions`.

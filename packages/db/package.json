@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
+    "generate:production": "drizzle-kit generate --config=drizzle.production.config.ts",
+    "migrate:production": "drizzle-kit migrate --config=drizzle.production.config.ts",
     "push": "drizzle-kit push",
     "studio": "drizzle-kit studio",
     "clean": "rm -rf dist .turbo"
