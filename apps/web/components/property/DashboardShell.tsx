@@ -62,49 +62,47 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
     propertyConditions.push(eq(properties.provider, provider));
   }
 
-  const query = db
-    .select({
-      property: properties,
-      saved: savedProperties,
-    })
-    .from(savedProperties)
-    .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
-    .where(and(...conditions, ...propertyConditions))
-    .orderBy(desc(savedProperties.savedAt))
-    .limit(limit)
-    .offset(offset);
-
-  const results = await query;
-
-  const countResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(savedProperties)
-    .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
-    .where(and(...conditions, ...propertyConditions));
+  const [results, countResult, allResults] = await Promise.all([
+    db
+      .select({
+        property: properties,
+        saved: savedProperties,
+      })
+      .from(savedProperties)
+      .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
+      .where(and(...conditions, ...propertyConditions))
+      .orderBy(desc(savedProperties.savedAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(savedProperties)
+      .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
+      .where(and(...conditions, ...propertyConditions)),
+    db
+      .select({
+        property: {
+          id: properties.id,
+          title: properties.title,
+          price: properties.price,
+          currency: properties.currency,
+          latitude: properties.latitude,
+          longitude: properties.longitude,
+          city: properties.city,
+          listingType: properties.listingType,
+          url: properties.url,
+          rawPayload: properties.rawPayload,
+        },
+        saved: savedProperties,
+      })
+      .from(savedProperties)
+      .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
+      .where(and(...conditions, ...propertyConditions))
+      .orderBy(desc(savedProperties.savedAt)),
+  ]);
 
   const total = countResult[0]?.count || 0;
   const totalPages = Math.ceil(total / limit);
-
-  const allResults = await db
-    .select({
-      property: {
-        id: properties.id,
-        title: properties.title,
-        price: properties.price,
-        currency: properties.currency,
-        latitude: properties.latitude,
-        longitude: properties.longitude,
-        city: properties.city,
-        listingType: properties.listingType,
-        url: properties.url,
-        rawPayload: properties.rawPayload,
-      },
-      saved: savedProperties,
-    })
-    .from(savedProperties)
-    .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
-    .where(and(...conditions, ...propertyConditions))
-    .orderBy(desc(savedProperties.savedAt));
 
   const mapData = allResults.map(({ property }) => ({
     id: property.id,
@@ -120,12 +118,16 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
   }));
 
   const propertyIds = results.map((r) => r.property.id);
-  const images = propertyIds.length
-    ? await db
-        .select()
-        .from(propertyImages)
-        .where(inArray(propertyImages.propertyId, propertyIds))
-    : [];
+  const [images, priceHistory] = propertyIds.length
+    ? await Promise.all([
+        db.select().from(propertyImages).where(inArray(propertyImages.propertyId, propertyIds)),
+        db
+          .select()
+          .from(propertyPriceHistory)
+          .where(inArray(propertyPriceHistory.propertyId, propertyIds))
+          .orderBy(desc(propertyPriceHistory.recordedAt)),
+      ])
+    : [[], []];
 
   const imagesByProperty = new Map<string, typeof images>();
   for (const img of images) {
@@ -133,14 +135,6 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
     list.push(img);
     imagesByProperty.set(img.propertyId, list);
   }
-
-  const priceHistory = propertyIds.length
-    ? await db
-        .select()
-        .from(propertyPriceHistory)
-        .where(inArray(propertyPriceHistory.propertyId, propertyIds))
-        .orderBy(desc(propertyPriceHistory.recordedAt))
-    : [];
 
   const priceHistoryByProperty = new Map<string, typeof priceHistory>();
   for (const hist of priceHistory) {

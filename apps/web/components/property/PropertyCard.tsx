@@ -76,6 +76,7 @@ interface PropertyCardProps {
   onToggleFavorite?: (id: string) => void;
   showDeleted?: boolean;
   readOnly?: boolean;
+  priority?: boolean;
   onRemove?: (id: string) => void;
 }
 
@@ -180,7 +181,7 @@ function ImageLightbox({
   );
 }
 
-export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly, onRemove }: PropertyCardProps) {
+export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly, priority, onRemove }: PropertyCardProps) {
   const [isFav, setIsFav] = useState(property.isFavorite);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -366,7 +367,8 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
           <img
             src={currentImage}
             alt={property.title}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             referrerPolicy="no-referrer"
             onClick={() => setLightboxOpen(true)}
             className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 cursor-pointer ${showDeleted ? "grayscale opacity-60" : ""}`}

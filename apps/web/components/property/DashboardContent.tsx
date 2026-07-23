@@ -98,12 +98,13 @@ export function DashboardContent({ properties, allProperties, showDeleted, readO
 
       {view === "list" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {items.map((property) => (
+          {items.map((property, index) => (
             <PropertyCard
               key={property.id}
               property={property}
               showDeleted={showDeleted}
               readOnly={readOnly}
+              priority={index === 0}
               onRemove={handleRemove}
             />
           ))}
