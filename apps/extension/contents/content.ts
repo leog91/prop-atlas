@@ -3,13 +3,13 @@ import type { PlasmoCSConfig } from "plasmo";
 
 export const config: PlasmoCSConfig = {
   matches: [
-    "https://www.daft.ie/*",
-    "https://www.idealista.com/*",
-    "https://www.idealista.es/*",
-    "https://www.idealista.it/*",
-    "https://www.idealista.pt/*",
-    "https://www.kamernet.nl/*",
-    "https://www.zonaprop.com.ar/*",
+    "https://*.daft.ie/*",
+    "https://*.idealista.com/*",
+    "https://*.idealista.es/*",
+    "https://*.idealista.it/*",
+    "https://*.idealista.pt/*",
+    "https://*.kamernet.nl/*",
+    "https://*.zonaprop.com.ar/*",
   ],
 };
 

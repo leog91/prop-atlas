@@ -6,6 +6,7 @@ import { properties, savedProperties, propertyImages, propertyPriceHistory } fro
 import { getDb } from "@/lib/db";
 import { DashboardContent } from "@/components/property/DashboardContent";
 import { ApiKeyManager } from "@/components/ApiKeyManager";
+import { isDemoUser } from "@/lib/demo";
 import Link from "next/link";
 
 interface DashboardShellProps {
@@ -255,7 +256,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
             </button>
           </form>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link
               href={buildUrl({ favorites: favoritesOnly ? "" : "true", page: "1" })}
               className={`rounded-md px-3 py-1.5 text-sm ${
@@ -322,6 +323,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
               properties={data}
               allProperties={mapData}
               showDeleted={showDeleted}
+              readOnly={isDemoUser(session.user)}
             />
 
             {totalPages > 1 && (

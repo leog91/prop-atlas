@@ -1,44 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ALLOWED_ORIGINS = [
-  "http://localhost:3000",
-  "chrome-extension://",
-];
-
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return true;
-  return ALLOWED_ORIGINS.some(
-    (allowed) => origin.startsWith(allowed)
+function allowedOrigins() {
+  return new Set(
+    (process.env.ALLOWED_CORS_ORIGINS || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
   );
 }
 
-export function withCors(
-  handler: (req: NextRequest) => Promise<NextResponse>
-) {
-  return async (req: NextRequest) => {
-    const origin = req.headers.get("origin");
+export function corsHeaders(origin: string | null): Record<string, string> {
+  if (!origin || !allowedOrigins().has(origin)) return {};
 
-    if (req.method === "OPTIONS") {
-      return new NextResponse(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": origin || "*",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-          "Access-Control-Allow-Credentials": "true",
-          "Access-Control-Max-Age": "86400",
-        },
-      });
-    }
-
-    const response = await handler(req);
-
-    if (isAllowedOrigin(origin)) {
-      response.headers.set("Access-Control-Allow-Origin", origin || "*");
-      response.headers.set("Access-Control-Allow-Credentials", "true");
-      response.headers.set("Access-Control-Expose-Headers", "Content-Length");
-    }
-
-    return response;
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Expose-Headers": "Content-Length",
+    Vary: "Origin",
   };
+}
+
+export function corsPreflightResponse(request: NextRequest) {
+  const headers = corsHeaders(request.headers.get("origin"));
+  if (!("Access-Control-Allow-Origin" in headers)) {
+    return new NextResponse(null, { status: 403 });
+  }
+
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...headers,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
 }

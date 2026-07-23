@@ -3,6 +3,7 @@ import { eq, and } from "@prop-atlas/db";
 import { savedProperties } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
+import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
 
 export async function PATCH(
   _request: Request,
@@ -10,6 +11,7 @@ export async function PATCH(
 ) {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const { id } = await params;
   const db = getDb();

@@ -4,6 +4,8 @@ import { propertySchema } from "@prop-atlas/types";
 import { properties, propertyImages, savedProperties, propertyPriceHistory, geocodeCache } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
+import { corsHeaders, corsPreflightResponse } from "@/lib/cors";
+import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
 import crypto from "crypto";
 
 const isDevelopment = process.env.NODE_ENV === "development";
@@ -14,23 +16,8 @@ function debugLog(...args: Parameters<typeof console.log>) {
   }
 }
 
-function corsHeaders(origin: string | null) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
-
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      ...corsHeaders(request.headers.get("origin")),
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
+  return corsPreflightResponse(request);
 }
 
 function parseListedDate(value?: string | null): Date | null {
@@ -222,10 +209,10 @@ export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   const { session, error } = await requireAuth(request);
   if (error) {
-    error.headers.set("Access-Control-Allow-Origin", origin || "*");
-    error.headers.set("Access-Control-Allow-Credentials", "true");
+    Object.entries(corsHeaders(origin)).forEach(([key, value]) => error.headers.set(key, value));
     return error;
   }
+  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const body = await request.json();
   debugLog("[SAVE] Received payload:", JSON.stringify(body, null, 2));

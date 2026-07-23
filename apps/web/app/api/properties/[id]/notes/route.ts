@@ -3,6 +3,7 @@ import { eq, and } from "@prop-atlas/db";
 import { savedProperties } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
+import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
 import { z } from "zod";
 
 const notesSchema = z.object({
@@ -15,6 +16,7 @@ export async function PATCH(
 ) {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const { id } = await params;
   const body = await request.json();

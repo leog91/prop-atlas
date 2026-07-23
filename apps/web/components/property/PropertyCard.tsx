@@ -75,6 +75,7 @@ interface PropertyCardProps {
   };
   onToggleFavorite?: (id: string) => void;
   showDeleted?: boolean;
+  readOnly?: boolean;
   onRemove?: (id: string) => void;
 }
 
@@ -179,7 +180,7 @@ function ImageLightbox({
   );
 }
 
-export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove }: PropertyCardProps) {
+export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly, onRemove }: PropertyCardProps) {
   const [isFav, setIsFav] = useState(property.isFavorite);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -404,7 +405,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
             </>
           )}
 
-          <div className="absolute right-2 top-2 flex gap-2">
+          {!readOnly && <div className="absolute right-2 top-2 flex gap-2">
             <button
               onClick={handleFavorite}
               disabled={loading}
@@ -452,7 +453,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
                 )}
               </svg>
             </button>
-          </div>
+          </div>}
           <div className="absolute left-2 top-2 flex gap-1">
             <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
               {property.listingType === "rent" ? "Rent" : "Buy"}
@@ -565,7 +566,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
           <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Notes</span>
-              {!isEditingNotes && (
+              {!readOnly && !isEditingNotes && (
                 <button
                   onClick={() => setIsEditingNotes(true)}
                   className="text-xs text-blue-600 hover:underline dark:text-blue-400"
@@ -618,7 +619,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, onRemove
             View on {property.provider}
           </a>
 
-          {showDeleted && (
+          {showDeleted && !readOnly && (
             <button
               onClick={handlePermanentDelete}
               disabled={deleteLoading}

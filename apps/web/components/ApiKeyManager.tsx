@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 
 export function ApiKeyManager() {
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -12,6 +13,7 @@ export function ApiKeyManager() {
       .then((res) => res.json())
       .then((data) => {
         setApiKey(data.key);
+        setIsDemo(data.demo === true);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -39,7 +41,9 @@ export function ApiKeyManager() {
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <h3 className="mb-2 text-sm font-semibold">Browser Extension API Key</h3>
       <p className="mb-3 text-xs text-gray-600 dark:text-gray-400">
-        Use this key to authenticate the browser extension. Keep it secret.
+        {isDemo
+          ? "The shared demo is read-only, so browser extension access is disabled."
+          : "Use this key to authenticate the browser extension. Keep it secret."}
       </p>
       
       {apiKey ? (
@@ -57,14 +61,14 @@ export function ApiKeyManager() {
             {copied ? "Copied!" : "Copy"}
           </button>
         </div>
-      ) : (
+      ) : !isDemo ? (
         <button
           onClick={generateKey}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
         >
           Generate API Key
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

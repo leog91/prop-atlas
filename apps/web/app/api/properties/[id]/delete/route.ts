@@ -3,10 +3,12 @@ import { eq, and } from "@prop-atlas/db";
 import { savedProperties, properties, propertyImages, propertyPriceHistory } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
+import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
 
 export async function PATCH(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const { id } = await params;
   const db = getDb();
@@ -43,6 +45,7 @@ export async function PATCH(_request: Request, { params }: { params: Promise<{ i
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const { id } = await params;
   const db = getDb();

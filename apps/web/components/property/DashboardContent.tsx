@@ -58,9 +58,10 @@ interface DashboardContentProps {
   properties: Property[];
   allProperties: MapProperty[];
   showDeleted?: boolean;
+  readOnly?: boolean;
 }
 
-export function DashboardContent({ properties, allProperties, showDeleted }: DashboardContentProps) {
+export function DashboardContent({ properties, allProperties, showDeleted, readOnly }: DashboardContentProps) {
   const [view, setView] = useState<"list" | "map">("list");
   const [items, setItems] = useState(properties);
   const [mapItems, setMapItems] = useState(allProperties);
@@ -102,6 +103,7 @@ export function DashboardContent({ properties, allProperties, showDeleted }: Das
               key={property.id}
               property={property}
               showDeleted={showDeleted}
+              readOnly={readOnly}
               onRemove={handleRemove}
             />
           ))}

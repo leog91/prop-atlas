@@ -15,18 +15,19 @@
     "@prop-atlas/providers": "workspace:*",
     "@prop-atlas/types": "workspace:*",
     "plasmo": "0.90.5",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@types/chrome": "0.0.268",
     "@types/node": "20.11.5",
-    "@types/react": "18.2.48",
-    "@types/react-dom": "18.2.18",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "typescript": "5.3.3"
   },
   "manifest": {
     "host_permissions": [
+      "http://localhost:3000/*",
       "https://*.daft.ie/*",
       "https://daft.ie/*",
       "https://*.idealista.com/*",

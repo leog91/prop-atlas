@@ -40,6 +40,12 @@ Web app runs at http://localhost:3000. Extension builds in watch mode.
 
 Supported platforms: Daft.ie, Kamernet.nl, Idealista, Zonaprop
 
+### Extension API access
+
+Chrome requires explicit permission for every API origin used by an extension. Local development is preconfigured for `http://localhost:3000`. Before a production build, add the deployed API origin to `apps/extension/package.json` under `manifest.host_permissions`.
+
+The API only permits configured origins. After loading an unpacked extension, copy its ID from `chrome://extensions` and add `chrome-extension://<extension-id>` to `ALLOWED_CORS_ORIGINS` in `apps/web/.env`, alongside the app URL.
+
 ## Page Snapshots (development-only)
 
 Page snapshots help during parser development. They capture a listing page’s raw structure (meta tags, JSON-LD, DOM nodes, page text, images, scripts) so you can inspect it while building or debugging a provider parser.
@@ -59,30 +65,24 @@ Snapshots are stored per-user in the `page_snapshots` table and can be deleted f
 
 ## Demo account
 
-A demo account is available for sharing and portfolio use:
+A read-only demo account is available for sharing and portfolio use:
 
 - Email: `demo@propatlas.com`
 - Password: `demo1234`
 
-To populate it with real listings:
+To refresh its data:
 
-1. Reset the demo user:
+1. Update `apps/web/scripts/demo-data.json` with the listings to display.
+2. Reset the demo user:
    ```bash
    bun run db:reset:demo
    ```
-2. Start the app:
+3. Start the app:
    ```bash
    bun run dev
    ```
-3. Sign in at `http://localhost:3000` with the demo credentials.
-4. Copy the **Browser Extension API Key** from the dashboard.
-5. Configure the extension popup with the API key.
-6. Save real listings from Daft, Idealista, Kamernet, or Zonaprop.
-7. Export the demo data:
-   ```bash
-   bun run db:export:demo
-   ```
+4. Sign in at `http://localhost:3000` with the demo credentials to verify the data.
 
-From then on, `bun run db:reset:demo` recreates those same real listings. Run steps 2–7 again when listings go stale.
+The demo account cannot generate API keys or modify saved properties. Use a separate account when capturing listings with the extension.
 
 > Demo data is sourced from public listings and may be outdated.

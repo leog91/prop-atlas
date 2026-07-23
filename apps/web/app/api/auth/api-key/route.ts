@@ -3,11 +3,13 @@ import { eq } from "@prop-atlas/db";
 import { apiKeys } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
+import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
 import crypto from "crypto";
 
 export async function POST() {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const db = getDb();
 
@@ -35,6 +37,7 @@ export async function POST() {
 export async function GET() {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (isDemoUser(session.user)) return NextResponse.json({ key: null, demo: true });
 
   const db = getDb();
 
