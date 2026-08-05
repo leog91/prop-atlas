@@ -39,6 +39,21 @@ async function resetDemo() {
     .where(eq(savedProperties.userId, existingUser.id));
 
   const propertyIds = saved.map((s) => s.propertyId);
+  const sharedPropertyIds = propertyIds.length > 0
+    ? await db
+        .select({
+          propertyId: savedProperties.propertyId,
+          userId: savedProperties.userId,
+        })
+        .from(savedProperties)
+        .where(inArray(savedProperties.propertyId, propertyIds))
+    : [];
+  const sharedPropertyIdSet = new Set(
+    sharedPropertyIds
+      .filter(({ userId }) => userId !== existingUser.id)
+      .map(({ propertyId }) => propertyId)
+  );
+  const demoOnlyPropertyIds = propertyIds.filter((id) => !sharedPropertyIdSet.has(id));
 
   // Delete user-related records
   await db.delete(apiKeys).where(eq(apiKeys.userId, existingUser.id));
@@ -47,11 +62,11 @@ async function resetDemo() {
   // savedProperties, sessions, accounts will cascade when user is deleted
   await db.delete(user).where(eq(user.id, existingUser.id));
 
-  // Delete demo properties and their related records
-  if (propertyIds.length > 0) {
-    await db.delete(propertyPriceHistory).where(inArray(propertyPriceHistory.propertyId, propertyIds));
-    await db.delete(propertyImages).where(inArray(propertyImages.propertyId, propertyIds));
-    await db.delete(properties).where(inArray(properties.id, propertyIds));
+  // Preserve globally shared properties that another account has also saved.
+  if (demoOnlyPropertyIds.length > 0) {
+    await db.delete(propertyPriceHistory).where(inArray(propertyPriceHistory.propertyId, demoOnlyPropertyIds));
+    await db.delete(propertyImages).where(inArray(propertyImages.propertyId, demoOnlyPropertyIds));
+    await db.delete(properties).where(inArray(properties.id, demoOnlyPropertyIds));
   }
 
   console.log("Demo data cleared. Re-seeding...");

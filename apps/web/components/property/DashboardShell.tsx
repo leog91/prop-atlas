@@ -30,7 +30,8 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
   }
 
   const params = searchParams;
-  const page = Math.max(1, parseInt(params.page || "1"));
+  const requestedPage = Number.parseInt(params.page || "1", 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const limit = 12;
   const offset = (page - 1) * limit;
   const favoritesOnly = params.favorites === "true";
@@ -39,6 +40,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
   const provider = params.provider || "";
   const showDeleted = params.deleted === "true";
   const isDemo = isDemoUser(session.user);
+  const showDemoSummary = isDemo && !showDeleted && !favoritesOnly && !search && !listingType && !provider;
 
   const db = getDb();
 
@@ -90,6 +92,9 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
           latitude: properties.latitude,
           longitude: properties.longitude,
           city: properties.city,
+          country: properties.country,
+          provider: properties.provider,
+          views: properties.views,
           listingType: properties.listingType,
           url: properties.url,
           rawPayload: properties.rawPayload,
@@ -104,6 +109,19 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
 
   const total = countResult[0]?.count || 0;
   const totalPages = Math.ceil(total / limit);
+
+  if (totalPages > 0 && page > totalPages) {
+    const validParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (key !== "page" && value) validParams.set(key, value);
+    }
+    validParams.set("page", String(totalPages));
+    redirect(`/?${validParams.toString()}`);
+  }
+
+  const providerCount = new Set(allResults.map(({ property }) => property.provider)).size;
+  const mappedCount = allResults.filter(({ property }) => property.latitude != null && property.longitude != null).length;
+  const sourceViews = allResults.reduce((sum, { property }) => sum + (property.views || 0), 0);
 
   const mapData = allResults.map(({ property }) => ({
     id: property.id,
@@ -227,6 +245,22 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
           </div>
         )}
 
+        {showDemoSummary && (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Demo dataset summary">
+            {[
+              [total.toLocaleString(), total === 1 ? "listing" : "listings"],
+              [providerCount.toLocaleString(), providerCount === 1 ? "provider" : "providers"],
+              [mappedCount.toLocaleString(), "mapped"],
+              [sourceViews.toLocaleString(), "listing views"],
+            ].map(([value, label]) => (
+              <div key={label} className="rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+                <p className="text-xl font-semibold tabular-nums">{value}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">
             {showDeleted ? "Trash" : "Saved Properties"}
@@ -276,7 +310,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
             >
               Favorites
             </Link>
-            <Link
+            {!isDemo && <Link
               href={buildUrl({ deleted: showDeleted ? "" : "true", page: "1", favorites: "", listingType: "", provider: "" })}
               className={`rounded-md px-3 py-1.5 text-sm ${
                 showDeleted
@@ -285,7 +319,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
               }`}
             >
               Trash
-            </Link>
+            </Link>}
             {["", "rent", "buy"].map((type) => (
               <Link
                 key={type}

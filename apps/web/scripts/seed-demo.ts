@@ -5,10 +5,9 @@ import {
   propertyImages,
   savedProperties,
   propertyPriceHistory,
-  apiKeys,
   user,
 } from "@prop-atlas/db";
-import { eq } from "@prop-atlas/db";
+import { and, eq } from "@prop-atlas/db";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -64,10 +63,6 @@ interface DemoData {
   properties: DemoProperty[];
 }
 
-function generateApiKey() {
-  return `pak_${crypto.randomBytes(32).toString("hex")}`;
-}
-
 export async function seedDemo() {
   const db = getDb();
 
@@ -93,16 +88,6 @@ export async function seedDemo() {
 
   const demoUserId = signUpResult.user.id;
   console.log("Created demo user:", demoUserId);
-
-  // Create an API key for the browser extension
-  const apiKey = generateApiKey();
-  await db.insert(apiKeys).values({
-    id: crypto.randomUUID(),
-    userId: demoUserId,
-    key: apiKey,
-    name: "Demo Extension",
-  });
-  console.log("Created demo API key:", apiKey);
 
   const dataFilePath = path.join(__dirname, "demo-data.json");
   let demoData: DemoData | null = null;
@@ -130,63 +115,80 @@ async function seedFromJson(
   data: DemoData
 ) {
   const now = new Date();
+  const demoProperties = data.properties.filter(
+    (property) => !property.providerListingId.startsWith("properties-amsterdam?")
+  );
 
-  for (const prop of data.properties) {
-    const propertyId = crypto.randomUUID();
+  for (const [propertyIndex, prop] of demoProperties.entries()) {
+    const existingProperty = await db
+      .select({ id: properties.id })
+      .from(properties)
+      .where(and(
+        eq(properties.provider, prop.provider),
+        eq(properties.providerListingId, prop.providerListingId)
+      ))
+      .limit(1);
+    const propertyId = existingProperty[0]?.id ?? crypto.randomUUID();
 
-    await db.insert(properties).values({
-      id: propertyId,
-      provider: prop.provider,
-      providerListingId: prop.providerListingId,
-      listingType: prop.listingType,
-      title: prop.title,
-      description: prop.description ?? null,
-      price: prop.price,
-      currency: prop.currency ?? "EUR",
-      expenses: prop.expenses ?? null,
-      expensesCurrency: prop.expensesCurrency ?? null,
-      propertyType: prop.propertyType,
-      bedrooms: prop.bedrooms ?? null,
-      bathrooms: prop.bathrooms ?? null,
-      area: prop.area ?? null,
-      areaUnit: prop.areaUnit ?? null,
-      address: prop.address ?? null,
-      city: prop.city ?? null,
-      country: prop.country ?? null,
-      postalCode: prop.postalCode ?? null,
-      latitude: prop.latitude ?? null,
-      longitude: prop.longitude ?? null,
-      url: prop.url,
-      listedAt: prop.listedAt ? new Date(prop.listedAt) : null,
-      views: prop.views ?? null,
-      deposit: prop.deposit ?? null,
-      depositCurrency: prop.depositCurrency ?? null,
-      floor: prop.floor ?? null,
-      hasElevator: prop.hasElevator ?? null,
-      hasParking: prop.hasParking ?? null,
-      isFurnished: prop.isFurnished ?? null,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    for (let i = 0; i < prop.images.length; i++) {
-      await db.insert(propertyImages).values({
-        id: crypto.randomUUID(),
-        propertyId,
-        url: prop.images[i],
-        sortOrder: i,
+    if (!existingProperty[0]) {
+      await db.insert(properties).values({
+        id: propertyId,
+        provider: prop.provider,
+        providerListingId: prop.providerListingId,
+        listingType: prop.listingType,
+        title: prop.title,
+        description: prop.description ?? null,
+        price: prop.price,
+        currency: prop.currency ?? "EUR",
+        expenses: prop.expenses ?? null,
+        expensesCurrency: prop.expensesCurrency ?? null,
+        propertyType: prop.propertyType,
+        bedrooms: prop.bedrooms ?? null,
+        bathrooms: prop.bathrooms ?? null,
+        area: prop.area ?? null,
+        areaUnit: prop.areaUnit ?? null,
+        address: prop.address ?? null,
+        city: prop.city ?? null,
+        country: prop.country ?? null,
+        postalCode: prop.postalCode ?? null,
+        latitude: prop.latitude ?? null,
+        longitude: prop.longitude ?? null,
+        url: prop.url,
+        listedAt: prop.listedAt ? new Date(prop.listedAt) : null,
+        views: prop.views ?? null,
+        deposit: prop.deposit ?? null,
+        depositCurrency: prop.depositCurrency ?? null,
+        floor: prop.floor ?? null,
+        hasElevator: prop.hasElevator ?? null,
+        hasParking: prop.hasParking ?? null,
+        isFurnished: prop.isFurnished ?? null,
         createdAt: now,
+        updatedAt: now,
       });
-    }
 
-    for (const hist of prop.priceHistory) {
-      await db.insert(propertyPriceHistory).values({
-        id: crypto.randomUUID(),
-        propertyId,
-        price: hist.price,
-        currency: hist.currency,
-        recordedAt: new Date(hist.recordedAt),
-      });
+      const images = prop.provider === "idealista" && !prop.providerListingId.startsWith("demo-")
+        ? prop.images.filter((url) => url.includes("img4.idealista.com")).slice(0, 1)
+        : prop.images.slice(0, 12);
+
+      for (let i = 0; i < images.length; i++) {
+        await db.insert(propertyImages).values({
+          id: crypto.randomUUID(),
+          propertyId,
+          url: images[i],
+          sortOrder: i,
+          createdAt: now,
+        });
+      }
+
+      for (const hist of prop.priceHistory) {
+        await db.insert(propertyPriceHistory).values({
+          id: crypto.randomUUID(),
+          propertyId,
+          price: hist.price,
+          currency: hist.currency,
+          recordedAt: new Date(hist.recordedAt),
+        });
+      }
     }
 
     await db.insert(savedProperties).values({
@@ -195,12 +197,12 @@ async function seedFromJson(
       propertyId,
       isFavorite: prop.saved.isFavorite,
       notes: prop.saved.notes ?? null,
-      savedAt: new Date(prop.saved.savedAt),
+      savedAt: new Date(now.getTime() - propertyIndex * 60_000),
       updatedAt: now,
     });
   }
 
-  console.log(`Seeded ${data.properties.length} demo properties from demo-data.json.`);
+  console.log(`Seeded ${demoProperties.length} curated demo properties from demo-data.json.`);
 }
 
 async function seedFallback(db: ReturnType<typeof getDb>, userId: string) {

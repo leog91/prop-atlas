@@ -21,7 +21,7 @@
       "postalCode": "28004",
       "latitude": 40.4168,
       "longitude": -3.7038,
-      "url": "https://www.idealista.com/en/inmueble/demo-1",
+      "url": "https://www.idealista.com/en/",
       "listedAt": "2026-06-13T00:38:28.000Z",
       "views": null,
       "deposit": null,
@@ -31,8 +31,8 @@
       "hasParking": null,
       "isFurnished": null,
       "images": [
-        "https://picsum.photos/id/1015/800/600",
-        "https://picsum.photos/id/1016/800/600"
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80"
       ],
       "priceHistory": [],
       "saved": {
@@ -62,7 +62,7 @@
       "postalCode": null,
       "latitude": 53.3498,
       "longitude": -6.2603,
-      "url": "https://www.daft.ie/property/demo-1",
+      "url": "https://www.daft.ie/property-for-rent/ireland",
       "listedAt": "2026-06-15T00:38:28.000Z",
       "views": null,
       "deposit": null,
@@ -72,13 +72,13 @@
       "hasParking": null,
       "isFurnished": null,
       "images": [
-        "https://picsum.photos/id/1021/800/600",
-        "https://picsum.photos/id/1022/800/600"
+        "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"
       ],
       "priceHistory": [],
       "saved": {
-        "isFavorite": false,
-        "notes": null,
+        "isFavorite": true,
+        "notes": "Excellent central location; compare commute time before arranging a viewing.",
         "savedAt": "2026-06-18T00:38:28.000Z"
       }
     },
@@ -103,7 +103,7 @@
       "postalCode": "1055",
       "latitude": 52.3676,
       "longitude": 4.9041,
-      "url": "https://kamernet.nl/huren/kamer/demo-1",
+      "url": "https://kamernet.nl/en/for-rent/room-amsterdam",
       "listedAt": "2026-06-11T00:38:28.000Z",
       "views": null,
       "deposit": null,
@@ -113,7 +113,7 @@
       "hasParking": null,
       "isFurnished": null,
       "images": [
-        "https://picsum.photos/id/1031/800/600"
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80"
       ],
       "priceHistory": [],
       "saved": {
@@ -143,7 +143,7 @@
       "postalCode": "C1425",
       "latitude": -34.5889,
       "longitude": -58.4303,
-      "url": "https://www.zonaprop.com.ar/propiedades/demo-1",
+      "url": "https://www.zonaprop.com.ar/departamentos-venta-palermo.html",
       "listedAt": "2026-06-16T00:38:28.000Z",
       "views": null,
       "deposit": null,
@@ -153,8 +153,8 @@
       "hasParking": null,
       "isFurnished": null,
       "images": [
-        "https://picsum.photos/id/1040/800/600",
-        "https://picsum.photos/id/1041/800/600"
+        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600573472550-8090b5e0745e?auto=format&fit=crop&w=1200&q=80"
       ],
       "priceHistory": [
         {
@@ -170,7 +170,7 @@
       ],
       "saved": {
         "isFavorite": true,
-        "notes": null,
+        "notes": "Price dropped 5%; shortlist for a second viewing and review building expenses.",
         "savedAt": "2026-06-18T00:38:28.000Z"
       }
     },
@@ -195,7 +195,7 @@
       "postalCode": "08037",
       "latitude": 41.3851,
       "longitude": 2.1734,
-      "url": "https://www.idealista.com/en/inmueble/demo-2",
+      "url": "https://www.idealista.com/en/venta-viviendas/barcelona-barcelona/",
       "listedAt": "2026-06-08T00:38:28.000Z",
       "views": null,
       "deposit": null,
@@ -205,9 +205,9 @@
       "hasParking": null,
       "isFurnished": null,
       "images": [
-        "https://picsum.photos/id/1050/800/600",
-        "https://picsum.photos/id/1051/800/600",
-        "https://picsum.photos/id/1052/800/600"
+        "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80"
       ],
       "priceHistory": [
         {
@@ -222,8 +222,8 @@
         }
       ],
       "saved": {
-        "isFavorite": false,
-        "notes": null,
+        "isFavorite": true,
+        "notes": "Private terrace is a strong plus; verify community fees and renovation history.",
         "savedAt": "2026-06-18T00:38:28.000Z"
       }
     },
@@ -1093,7 +1093,7 @@
       "postalCode": null,
       "latitude": 52.296305,
       "longitude": 4.970661,
-      "url": "https://kamernet.nl/en/for-rent/room-amsterdam/montfoorthof/room-2377983",
+      "url": "https://kamernet.nl/en/for-rent/room-amsterdam",
       "listedAt": "2026-05-21T10:47:49.000Z",
       "views": null,
       "deposit": 800,
@@ -1144,7 +1144,7 @@
       "postalCode": null,
       "latitude": 52.291994,
       "longitude": 4.591816,
-      "url": "https://kamernet.nl/en/for-rent/room-hillegom/van-limburg-stirumlaan/room-2377577",
+      "url": "https://kamernet.nl/en/for-rent/room-amsterdam",
       "listedAt": "2026-05-20T07:47:46.000Z",
       "views": null,
       "deposit": null,
@@ -1193,7 +1193,7 @@
       "postalCode": null,
       "latitude": 52.192024,
       "longitude": 4.754806,
-      "url": "https://kamernet.nl/en/for-rent/anti-squat-nieuwveen/roggeveldweg/anti-squat-2377781",
+      "url": "https://kamernet.nl/en/for-rent/room-amsterdam",
       "listedAt": "2026-05-20T13:57:19.000Z",
       "views": null,
       "deposit": null,
@@ -1242,7 +1242,7 @@
       "postalCode": null,
       "latitude": 52.337584,
       "longitude": 4.931858,
-      "url": "https://kamernet.nl/en/for-rent/room-amsterdam/duivendrechtsekade/room-2378073",
+      "url": "https://kamernet.nl/en/for-rent/room-amsterdam",
       "listedAt": "2026-05-21T14:38:21.000Z",
       "views": null,
       "deposit": null,
@@ -1299,7 +1299,7 @@
       "postalCode": null,
       "latitude": 52.355627,
       "longitude": 4.824417,
-      "url": "https://kamernet.nl/en/for-rent/room-amsterdam/tourniairestraat/room-2378092",
+      "url": "https://kamernet.nl/en/for-rent/room-amsterdam",
       "listedAt": "2026-05-21T14:42:41.000Z",
       "views": null,
       "deposit": null,
