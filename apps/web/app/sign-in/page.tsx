@@ -15,32 +15,42 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const authenticate = async (credentials: { email: string; password: string }) => {
     setError(null);
     setLoading(true);
 
-    const result = await signIn.email({ email, password });
+    try {
+      const result = await signIn.email(credentials);
 
-    if (result.error) {
-      setError(result.error.message || "Invalid credentials");
+      if (result.error) {
+        setError(result.error.message || "Invalid credentials");
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("Unable to sign in right now. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push("/");
   };
 
-  const fillDemoCredentials = () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await authenticate({ email, password });
+  };
+
+  const openDemo = async () => {
     setEmail(DEMO_EMAIL);
     setPassword(DEMO_PASSWORD);
-    setError(null);
+    await authenticate({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
   };
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Left side: app pitch */}
-      <div className="flex flex-1 items-center justify-center bg-gray-50 px-6 py-12 dark:bg-gray-900/50 lg:px-12">
+      <div className="order-2 flex flex-1 items-center justify-center bg-gray-50 px-6 py-12 dark:bg-gray-900/50 lg:order-1 lg:px-12">
         <div className="max-w-md space-y-8">
           <div className="space-y-4">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
@@ -98,7 +108,7 @@ export default function SignInPage() {
       </div>
 
       {/* Right side: sign-in form */}
-      <div className="flex flex-1 items-center justify-center px-6 py-12 lg:px-12">
+      <div className="order-1 flex min-h-screen flex-1 items-center justify-center px-6 py-12 lg:order-2 lg:min-h-0 lg:px-12">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
             <h2 className="text-2xl font-bold">Sign in</h2>
@@ -121,6 +131,7 @@ export default function SignInPage() {
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -136,6 +147,7 @@ export default function SignInPage() {
               <input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -164,10 +176,11 @@ export default function SignInPage() {
             </p>
             <button
               type="button"
-              onClick={fillDemoCredentials}
-              className="w-full cursor-pointer rounded-md border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-gray-900 dark:text-blue-300 dark:hover:bg-gray-800"
+              onClick={openDemo}
+              disabled={loading}
+              className="w-full cursor-pointer rounded-md border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-800 dark:bg-gray-900 dark:text-blue-300 dark:hover:bg-gray-800"
             >
-              Use demo credentials
+              {loading ? "Opening demo..." : "Explore the demo"}
             </button>
             <p className="mt-3 text-xs text-blue-600 dark:text-blue-200">
               Demo data is sourced from public listings and may be outdated.

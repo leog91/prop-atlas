@@ -38,6 +38,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
   const listingType = params.listingType || "";
   const provider = params.provider || "";
   const showDeleted = params.deleted === "true";
+  const isDemo = isDemoUser(session.user);
 
   const db = getDb();
 
@@ -208,9 +209,23 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <div className="mb-6">
-          <ApiKeyManager />
-        </div>
+        {isDemo ? (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-100">
+            <svg className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold">Demo workspace</p>
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                Explore the listings, filters, galleries, and map. Editing is disabled so this shared account stays ready for every visitor.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6">
+            <ApiKeyManager />
+          </div>
+        )}
 
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">
@@ -219,7 +234,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
               ({total})
             </span>
           </h1>
-          {process.env.NODE_ENV === "development" && (
+          {process.env.NODE_ENV === "development" && !isDemo && (
             <Link
               href="/snapshots"
               className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700"
@@ -317,7 +332,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
               properties={data}
               allProperties={mapData}
               showDeleted={showDeleted}
-              readOnly={isDemoUser(session.user)}
+              readOnly={isDemo}
             />
 
             {totalPages > 1 && (

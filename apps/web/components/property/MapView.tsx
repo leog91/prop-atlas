@@ -110,13 +110,25 @@ export function MapView({ properties, center, zoom = 5 }: MapViewProps) {
     (bounds.minLat + bounds.maxLat) / 2,
     (bounds.minLng + bounds.maxLng) / 2,
   ];
-  const mapCenter = center ?? computedCenter;
+  const mapBounds: [[number, number], [number, number]] = [
+    [bounds.minLat, bounds.minLng],
+    [bounds.maxLat, bounds.maxLng],
+  ];
+  const shouldFitBounds = !center && validProperties.length > 1;
 
   return (
     <div className="h-[500px] w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
       <MapContainer
-        center={validProperties.length === 1 ? [validProperties[0].latitude, validProperties[0].longitude] : mapCenter}
-        zoom={validProperties.length === 1 ? 13 : zoom}
+        center={
+          shouldFitBounds
+            ? undefined
+            : validProperties.length === 1
+              ? [validProperties[0].latitude, validProperties[0].longitude]
+              : (center ?? computedCenter)
+        }
+        zoom={shouldFitBounds ? undefined : (validProperties.length === 1 ? 13 : zoom)}
+        bounds={shouldFitBounds ? mapBounds : undefined}
+        boundsOptions={{ padding: [32, 32], maxZoom: 13 }}
         className="h-full w-full"
         scrollWheelZoom={true}
       >
