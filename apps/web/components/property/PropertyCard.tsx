@@ -44,6 +44,24 @@ function FlagIcon({ country }: { country: string }) {
   return <>{FLAGS[country] || null}</>;
 }
 
+function displayImageUrl(url: string) {
+  try {
+    if (new URL(url).hostname === "media.daft.ie") {
+      return `/api/images?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    return "/placeholder-property.svg";
+  }
+
+  return url;
+}
+
+function useImageFallback(event: React.SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+  image.onerror = null;
+  image.src = "/placeholder-property.svg";
+}
+
 interface PropertyCardProps {
   property: {
     id: string;
@@ -165,9 +183,10 @@ function ImageLightbox({
       <div className="max-h-[85vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={images[index]}
+          src={displayImageUrl(images[index])}
           alt=""
           referrerPolicy="no-referrer"
+          onError={useImageFallback}
           className="max-h-[85vh] max-w-[90vw] object-contain"
         />
       </div>
@@ -232,6 +251,11 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
   const images = property.images.length > 0 ? property.images : ["/placeholder-property.svg"];
   const currentImage = images[imageIndex];
   const hasMultiple = images.length > 1;
+  const savedTime = property.savedAt ? new Date(property.savedAt).getTime() : null;
+  const updatedTime = property.updatedAt ? new Date(property.updatedAt).getTime() : null;
+  const showUpdatedAt = Boolean(property.updatedAt) && (
+    savedTime == null || updatedTime == null || Math.abs(updatedTime - savedTime) > 60 * 60 * 1000
+  );
 
   const nextImage = useCallback(() => {
     setImageIndex((i) => (i === images.length - 1 ? 0 : i + 1));
@@ -361,15 +385,16 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
 
   return (
     <>
-      <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="group flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={currentImage}
+            src={displayImageUrl(currentImage)}
             alt={property.title}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             referrerPolicy="no-referrer"
+            onError={useImageFallback}
             onClick={() => setLightboxOpen(true)}
             className={`absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105 cursor-pointer ${showDeleted ? "grayscale opacity-60" : ""}`}
           />
@@ -378,7 +403,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/50 group-hover:opacity-100"
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white opacity-100 transition-opacity hover:bg-black/60 sm:opacity-0 sm:group-hover:opacity-100"
                 aria-label="Previous image"
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -387,26 +412,26 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/50 group-hover:opacity-100"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white opacity-100 transition-opacity hover:bg-black/60 sm:opacity-0 sm:group-hover:opacity-100"
                 aria-label="Next image"
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                {images.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={(e) => { e.stopPropagation(); setImageIndex(i); }}
-                    className={`h-1.5 rounded-full transition-all ${i === imageIndex ? "w-4 bg-white" : "w-1.5 bg-white/60 hover:bg-white/80"}`}
-                    aria-label={`Go to image ${i + 1}`}
-                  />
-                ))}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+                {imageIndex + 1} / {images.length}
               </div>
             </>
           )}
 
+          {readOnly && isFav && (
+            <span className="absolute right-2 top-2 rounded-full bg-white/90 p-2 shadow-sm backdrop-blur-sm dark:bg-gray-900/90" title="Favorite">
+              <svg className="h-5 w-5 fill-red-500 text-red-500" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-label="Favorite">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </span>
+          )}
           {!readOnly && <div className="absolute right-2 top-2 flex gap-2">
             <button
               onClick={handleFavorite}
@@ -467,9 +492,9 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="flex flex-1 flex-col p-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-1 text-sm font-medium">{property.title}</h3>
+            <h2 className="line-clamp-1 text-sm font-medium">{property.title}</h2>
           </div>
 
           <div className="mt-1 flex items-baseline gap-2 flex-wrap">
@@ -525,7 +550,7 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
           </div>
 
           {(property.listedAt || property.views != null) && (
-            <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
+            <div className="mt-2 flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
               {property.listedAt && (() => {
                 const { formatted, relative } = formatDate(property.listedAt);
                 return (
@@ -541,8 +566,8 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
             </div>
           )}
 
-          {(property.savedAt || property.updatedAt) && (
-            <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+          {(property.savedAt || showUpdatedAt) && (
+            <div className="mt-1 flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
               {property.savedAt && (() => {
                 const { formatted, relative } = formatDate(property.savedAt);
                 return (
@@ -552,8 +577,8 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
                   </span>
                 );
               })()}
-              {property.updatedAt && (() => {
-                const { formatted, relative } = formatDate(property.updatedAt);
+              {showUpdatedAt && (() => {
+                const { formatted, relative } = formatDate(property.updatedAt!);
                 return (
                   <span>
                     Updated {formatted}
@@ -564,10 +589,9 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
             </div>
           )}
 
-          {/* Notes Section */}
-          <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+          {(!readOnly || notes) && <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Notes</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Notes</span>
               {!readOnly && !isEditingNotes && (
                 <button
                   onClick={() => setIsEditingNotes(true)}
@@ -610,13 +634,13 @@ export function PropertyCard({ property, onToggleFavorite, showDeleted, readOnly
                 {notes || "No notes added yet."}
               </p>
             )}
-          </div>
+          </div>}
 
           <a
             href={property.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 block text-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            className="mt-auto block rounded-md border border-gray-300 px-3 py-1.5 text-center text-xs font-medium hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
           >
             View on {property.provider}
           </a>

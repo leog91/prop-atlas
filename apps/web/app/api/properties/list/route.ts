@@ -9,8 +9,12 @@ export async function GET(request: Request) {
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+  const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+  const requestedLimit = Number.parseInt(searchParams.get("limit") || "20", 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(50, Math.max(1, requestedLimit))
+    : 20;
   const offset = (page - 1) * limit;
   const favoritesOnly = searchParams.get("favorites") === "true";
   const showDeleted = searchParams.get("deleted") === "true";

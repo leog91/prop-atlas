@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title description">
+  <title id="title">Property image unavailable</title>
+  <desc id="description">A simple house illustration</desc>
+  <rect width="800" height="600" fill="#f3f4f6"/>
+  <path d="M224 304 400 164l176 140v188a28 28 0 0 1-28 28H252a28 28 0 0 1-28-28V304Z" fill="#dbeafe" stroke="#93c5fd" stroke-width="18" stroke-linejoin="round"/>
+  <path d="m176 332 224-178 224 178" fill="none" stroke="#60a5fa" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M352 520V368h96v152" fill="#fff" stroke="#93c5fd" stroke-width="16"/>
+  <circle cx="424" cy="446" r="8" fill="#60a5fa"/>
+</svg>
