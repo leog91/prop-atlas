@@ -19,7 +19,7 @@ export function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-export function corsPreflightResponse(request: NextRequest) {
+export function corsPreflightResponse(request: NextRequest, methods = "POST, OPTIONS") {
   const headers = corsHeaders(request.headers.get("origin"));
   if (!("Access-Control-Allow-Origin" in headers)) {
     return new NextResponse(null, { status: 403 });
@@ -29,9 +29,17 @@ export function corsPreflightResponse(request: NextRequest) {
     status: 204,
     headers: {
       ...headers,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": methods,
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Max-Age": "86400",
     },
   });
+}
+
+/** Copies the allowlisted CORS headers onto a response built elsewhere (e.g. an auth error). */
+export function withCors<T extends Response>(response: T, origin: string | null): T {
+  for (const [key, value] of Object.entries(corsHeaders(origin))) {
+    response.headers.set(key, value);
+  }
+  return response;
 }

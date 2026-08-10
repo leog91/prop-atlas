@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
+import { corsHeaders, corsPreflightResponse, withCors } from "@/lib/cors";
 import { pageSnapshots } from "@prop-atlas/db";
-import { eq, desc } from "@prop-atlas/db";
-
-function corsHeaders(origin: string | null) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
+import { eq, and, desc } from "@prop-atlas/db";
 
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      ...corsHeaders(request.headers.get("origin")),
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
+  return corsPreflightResponse(request, "GET, OPTIONS");
 }
 
 export async function GET(request: NextRequest) {
@@ -30,34 +16,23 @@ export async function GET(request: NextRequest) {
 
   const origin = request.headers.get("origin");
   const { session, error } = await requireAuth(request);
-  if (error) {
-    error.headers.set("Access-Control-Allow-Origin", origin || "*");
-    error.headers.set("Access-Control-Allow-Credentials", "true");
-    return error;
-  }
+  if (error) return withCors(error, origin);
 
   const { searchParams } = new URL(request.url);
   const provider = searchParams.get("provider");
 
   const db = getDb();
 
-  const query = db
+  const conditions = [eq(pageSnapshots.userId, session.user.id)];
+  if (provider) {
+    conditions.push(eq(pageSnapshots.provider, provider));
+  }
+
+  const snapshots = await db
     .select()
     .from(pageSnapshots)
-    .where(eq(pageSnapshots.userId, session.user.id))
+    .where(and(...conditions))
     .orderBy(desc(pageSnapshots.createdAt));
 
-  // Note: drizzle-orm SQLite doesn't support dynamic where easily without conditions.
-  // For simplicity, we filter in memory or use raw sql. Given small dataset, in-memory is fine.
-  // A cleaner way is to use sql`${and(...)}` but let's keep it simple.
-  const rows = await query;
-
-  const filtered = provider
-    ? rows.filter((r) => r.provider === provider)
-    : rows;
-
-  return NextResponse.json(
-    { snapshots: filtered },
-    { headers: corsHeaders(origin) }
-  );
+  return NextResponse.json({ snapshots }, { headers: corsHeaders(origin) });
 }

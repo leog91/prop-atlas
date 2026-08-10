@@ -148,7 +148,10 @@ export const apiKeys = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    key: text("key").notNull().unique(),
+    // Only the SHA-256 of the key is stored. The raw key is shown once, at creation.
+    keyHash: text("key_hash").notNull().unique(),
+    // Leading characters of the raw key, kept so the UI can identify it after creation.
+    keyPrefix: text("key_prefix").notNull(),
     name: text("name").notNull().default("Extension"),
     lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -157,7 +160,7 @@ export const apiKeys = sqliteTable(
   },
   (table) => [
     index("api_keys_user_id_idx").on(table.userId),
-    index("api_keys_key_idx").on(table.key),
+    index("api_keys_key_hash_idx").on(table.keyHash),
   ]
 );
 
@@ -186,8 +189,10 @@ export const geocodeCache = sqliteTable(
   "geocode_cache",
   {
     query: text("query").primaryKey(),
-    latitude: real("latitude").notNull(),
-    longitude: real("longitude").notNull(),
+    // Null coordinates record a known miss, so a failed lookup is not retried
+    // against Nominatim on every subsequent save.
+    latitude: real("latitude"),
+    longitude: real("longitude"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),

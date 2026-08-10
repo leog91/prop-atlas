@@ -33,7 +33,9 @@ Web app runs at http://localhost:3000. Extension builds in watch mode.
 ## Usage
 
 1. **Sign up** at `/sign-up`
-2. **Generate API key** on the dashboard
+2. **Generate API key** on the dashboard. Only a hash is stored, so the key is
+   displayed once at creation — copy it before leaving the page. Regenerating
+   issues a new key and invalidates the previous one.
 3. **Configure extension**: Open popup → Settings → Paste API key
 4. **Save properties**: Visit a supported listing, click extension icon, hit "Save Property"
 5. **Manage**: View, filter, favorite, and note properties on the dashboard

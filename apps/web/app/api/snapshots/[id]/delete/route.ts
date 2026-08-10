@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
-import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
 import { pageSnapshots } from "@prop-atlas/db";
 import { eq, and } from "@prop-atlas/db";
 
@@ -10,9 +9,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { session, error } = await requireAuth(request);
+  const { session, error } = await requireAuth(request, { write: true });
   if (error) return error;
-  if (isDemoUser(session.user)) return demoReadOnlyResponse();
 
   const { id } = await params;
   const db = getDb();

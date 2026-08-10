@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
-import { corsHeaders, corsPreflightResponse } from "@/lib/cors";
-import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
+import { corsHeaders, corsPreflightResponse, withCors } from "@/lib/cors";
+import { readJsonBody } from "@/lib/http";
 import { pageSnapshots } from "@prop-atlas/db";
 import { z } from "zod";
 import crypto from "crypto";
@@ -31,14 +31,12 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = request.headers.get("origin");
-  const { session, error } = await requireAuth(request);
-  if (error) {
-    Object.entries(corsHeaders(origin)).forEach(([key, value]) => error.headers.set(key, value));
-    return error;
-  }
-  if (isDemoUser(session.user)) return demoReadOnlyResponse();
+  const { session, error } = await requireAuth(request, { write: true });
+  if (error) return withCors(error, origin);
 
-  const body = await request.json();
+  const { body, error: bodyError } = await readJsonBody(request);
+  if (bodyError) return withCors(bodyError, origin);
+
   debugLog("[SNAPSHOT SAVE] Received payload:", JSON.stringify(body, null, 2));
 
   const parsed = snapshotSchema.safeParse(body);

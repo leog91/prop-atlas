@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "@prop-atlas/db";
 import { propertySchema } from "@prop-atlas/types";
-import { properties, propertyImages, savedProperties, propertyPriceHistory, geocodeCache } from "@prop-atlas/db";
+import { properties, propertyImages, savedProperties, propertyPriceHistory } from "@prop-atlas/db";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getDb } from "@/lib/db";
-import { corsHeaders, corsPreflightResponse } from "@/lib/cors";
-import { demoReadOnlyResponse, isDemoUser } from "@/lib/demo";
+import { corsHeaders, corsPreflightResponse, withCors } from "@/lib/cors";
+import { geocodeListing } from "@/lib/geocode";
+import { readJsonBody } from "@/lib/http";
 import crypto from "crypto";
 
 const isDevelopment = process.env.NODE_ENV === "development";
@@ -78,124 +79,6 @@ function getRawPayload(data: unknown): Record<string, unknown> {
   return data && typeof data === "object" ? (data as Record<string, unknown>) : {};
 }
 
-function stripLocationLabel(value: string) {
-  return value.replace(/^(urb\.?|barrio|distrito|área|area)\s+/i, "").trim();
-}
-
-function isAddressNoise(value: string) {
-  return /^(ampliar mapa|ver mapa|mapa)$/i.test(value.trim());
-}
-
-function getAddressParts(address?: string) {
-  return (address || "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0 && !isAddressNoise(part));
-}
-
-function inferCity(addressParts: string[], city?: string) {
-  if (city) return city;
-  const ignored = /^(urb\.?|barrio|distrito|área|area)\b/i;
-  const inferred = [...addressParts].reverse().find((part) => {
-    return !ignored.test(part) && !/^\d{4,5}$/.test(part);
-  });
-
-  return inferred ? stripLocationLabel(inferred) : undefined;
-}
-
-function joinGeocodeQuery(parts: Array<string | undefined>, country?: string) {
-  const cleanedParts = parts.filter((part): part is string => !!part && part.trim().length > 0);
-  const hasSpecificPlace = cleanedParts.some((part) => part !== country);
-  return hasSpecificPlace ? cleanedParts.join(", ") : "";
-}
-
-function getAddressGeocodeQueries(address?: string, city?: string, country?: string) {
-  const parts = getAddressParts(address);
-  const inferredCity = inferCity(parts, city);
-  const postalCode = parts.find((part) => /^\d{4,5}$/.test(part));
-  const street = parts[0];
-  const urbanization = parts.find((part) => /^urb\.?\b/i.test(part));
-  const neighborhood = parts.find((part) => /^barrio\b/i.test(part));
-  const district = parts.find((part) => /^distrito\b/i.test(part));
-  const cleanedArea = parts.find((part) => /^(área|area)\b/i.test(part));
-
-  return [
-    joinGeocodeQuery([street, postalCode, inferredCity, country], country),
-    joinGeocodeQuery([street, inferredCity, country], country),
-    joinGeocodeQuery([stripLocationLabel(urbanization || ""), inferredCity, country], country),
-    joinGeocodeQuery([stripLocationLabel(neighborhood || ""), inferredCity, country], country),
-    joinGeocodeQuery([stripLocationLabel(district || ""), inferredCity, country], country),
-    joinGeocodeQuery([stripLocationLabel(cleanedArea || ""), country], country),
-    joinGeocodeQuery([parts.join(", "), city, country], country),
-    joinGeocodeQuery([inferredCity, country], country),
-  ];
-}
-
-function getGeocodeQueries(data: {
-  address?: string;
-  city?: string;
-  country?: string;
-  rawPayload?: Record<string, unknown>;
-}) {
-  const rawQueries = data.rawPayload?.geocodeQueries;
-  const payloadQueries = Array.isArray(rawQueries)
-    ? rawQueries.filter((query): query is string => typeof query === "string" && query.trim().length > 0)
-    : [];
-
-  const firstQueries: string[] = [];
-  const fallbackQueries: string[] = [];
-
-  // 1. Try the full raw location line FIRST (exactly as Zonaprop shows it)
-  const rawLoc = data.rawPayload?.locationLine;
-  if (typeof rawLoc === "string" && rawLoc.trim().length > 0) {
-    const loc = rawLoc.trim();
-    const country = data.country || "";
-    firstQueries.push(`${loc}, ${country}`.trim().replace(/,$/, ""));
-    if (data.country?.toLowerCase() === "argentina") {
-      firstQueries.push(`${loc}, Buenos Aires, Argentina`);
-      firstQueries.push(`${loc}, Provincia de Buenos Aires, Argentina`);
-    }
-  }
-
-  // 2. Fallback: split address/city permutations
-  fallbackQueries.push(...getAddressGeocodeQueries(data.address, data.city, data.country));
-
-  // 3. Argentina-specific province hints
-  if (data.country?.toLowerCase() === "argentina" && data.city) {
-    if (data.address) {
-      fallbackQueries.push(`${data.address}, ${data.city}, Buenos Aires, Argentina`);
-      fallbackQueries.push(`${data.address}, ${data.city}, Provincia de Buenos Aires, Argentina`);
-    }
-    fallbackQueries.push(`${data.city}, Buenos Aires, Argentina`);
-    fallbackQueries.push(`${data.city}, Provincia de Buenos Aires, Argentina`);
-  }
-
-  return Array.from(new Set([...payloadQueries, ...firstQueries, ...fallbackQueries].filter((query) => query.trim().length > 0)));
-}
-
-async function geocodeQuery(query: string): Promise<{ latitude: number; longitude: number } | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "PropAtlas/1.0",
-      },
-    });
-    if (!response.ok) return null;
-    const results = await response.json();
-    if (results.length > 0) {
-      return {
-        latitude: parseFloat(results[0].lat),
-        longitude: parseFloat(results[0].lon),
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error("[GEOCODE] Error:", error);
-    return null;
-  }
-}
-
 function normalizeIncomingPrice(data: { provider: string; price?: number }) {
   if (data.price == null) return undefined;
   if (data.provider === "idealista" && data.price > 0 && data.price < 100 && !Number.isInteger(data.price)) {
@@ -207,14 +90,12 @@ function normalizeIncomingPrice(data: { provider: string; price?: number }) {
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
-  const { session, error } = await requireAuth(request);
-  if (error) {
-    Object.entries(corsHeaders(origin)).forEach(([key, value]) => error.headers.set(key, value));
-    return error;
-  }
-  if (isDemoUser(session.user)) return demoReadOnlyResponse();
+  const { session, error } = await requireAuth(request, { write: true });
+  if (error) return withCors(error, origin);
 
-  const body = await request.json();
+  const { body, error: bodyError } = await readJsonBody(request);
+  if (bodyError) return withCors(bodyError, origin);
+
   debugLog("[SAVE] Received payload:", JSON.stringify(body, null, 2));
   const parsed = propertySchema.safeParse(body);
 
@@ -242,49 +123,18 @@ export async function POST(request: NextRequest) {
   if (latitude == null || longitude == null) {
     debugLog("[GEOCODE] No coordinates found, attempting geocoding...");
     debugLog("[GEOCODE] Address:", data.address, "City:", data.city, "Country:", data.country);
-    for (const query of getGeocodeQueries({ ...data, rawPayload: incomingRawPayload })) {
-      debugLog("[GEOCODE] Trying:", query);
-      
-      // Check cache first
-      const cached = await db
-        .select()
-        .from(geocodeCache)
-        .where(eq(geocodeCache.query, query))
-        .limit(1);
 
-      if (cached.length > 0) {
-        latitude = cached[0].latitude;
-        longitude = cached[0].longitude;
-        isApproximateLocation = true;
-        geocodeQueryUsed = query;
-        debugLog("[GEOCODE] Cache hit:", { query, latitude, longitude });
-        break;
-      }
+    const geocoded = await geocodeListing(
+      { ...data, rawPayload: incomingRawPayload },
+      debugLog
+    );
 
-      // Query OpenStreetMap Nominatim
-      const geocoded = await geocodeQuery(query);
-      if (geocoded) {
-        latitude = geocoded.latitude;
-        longitude = geocoded.longitude;
-        isApproximateLocation = true;
-        geocodeQueryUsed = query;
-        debugLog("[GEOCODE] Success:", { query, ...geocoded });
-
-        // Save to cache
-        try {
-          await db.insert(geocodeCache).values({
-            query,
-            latitude,
-            longitude,
-          });
-          debugLog("[GEOCODE] Saved to cache:", query);
-        } catch (cacheErr) {
-          console.error("[GEOCODE] Failed to cache:", cacheErr);
-        }
-        break;
-      }
-    }
-    if (latitude == null || longitude == null) {
+    if (geocoded) {
+      latitude = geocoded.latitude;
+      longitude = geocoded.longitude;
+      isApproximateLocation = true;
+      geocodeQueryUsed = geocoded.query;
+    } else {
       debugLog("[GEOCODE] Failed to geocode");
     }
   } else {
