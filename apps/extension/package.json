@@ -28,6 +28,7 @@
   "manifest": {
     "host_permissions": [
       "http://localhost:3000/*",
+      "https://prop-atlas-web.vercel.app/*",
       "https://*.daft.ie/*",
       "https://daft.ie/*",
       "https://*.idealista.com/*",

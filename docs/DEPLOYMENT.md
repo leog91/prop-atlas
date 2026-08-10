@@ -49,11 +49,7 @@ dashboard and repaste it into the extension.
 
 ## Extension
 
-After the web app has a production URL, create `apps/extension/.env` with:
-
-```env
-PLASMO_PUBLIC_API_URL=https://your-domain.com
-```
+The extension contains a persisted environment selector for the local app and `https://prop-atlas-web.vercel.app`. If the deployment URL changes, update `API_URLS` in `apps/extension/src/popup/index.tsx` and the matching host permission in `apps/extension/package.json`.
 
 Build and distribute the extension separately from Vercel:
 

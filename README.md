@@ -17,9 +17,8 @@ Prerequisites: Node.js 18+, Bun, Chrome
 ```bash
 bun install
 
-# Setup app-specific environment files
+# Set up the web environment
 cp apps/web/.env.example apps/web/.env
-cp apps/extension/.env.example apps/extension/.env
 
 # Database
 cd packages/db && bun run push
@@ -46,7 +45,7 @@ See [deployment instructions](docs/DEPLOYMENT.md) for Turso migrations, Vercel c
 
 ### Extension API access
 
-Chrome requires explicit permission for every API origin used by an extension. Local development is preconfigured for `http://localhost:3000`. Before a production build, add the deployed API origin to `apps/extension/package.json` under `manifest.host_permissions`.
+Chrome requires explicit permission for every API origin used by an extension. The manifest includes both `http://localhost:3000` and `https://prop-atlas-web.vercel.app`. Choose **Production** or **Development (localhost)** in the extension settings; the selection is saved locally in Chrome.
 
 The API only permits configured origins. After loading an unpacked extension, copy its ID from `chrome://extensions` and add `chrome-extension://<extension-id>` to `ALLOWED_CORS_ORIGINS` in `apps/web/.env`, alongside the app URL.
 

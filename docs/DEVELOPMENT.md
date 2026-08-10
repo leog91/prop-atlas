@@ -5,7 +5,6 @@
 ```bash
 bun install
 cp apps/web/.env.example apps/web/.env
-cp apps/extension/.env.example apps/extension/.env
 cd packages/db && bun run push
 ```
 
@@ -21,7 +20,7 @@ bun run typecheck # Type-check all
 
 ## Extension API Origin
 
-The extension can call only origins declared in `apps/extension/package.json`. `http://localhost:3000` is included for local development; add the deployed URL before building for production.
+The extension manifest permits both `http://localhost:3000` and `https://prop-atlas-web.vercel.app`. Open the extension settings and select **Development (localhost)** while working locally. The selection is saved in Chrome storage and can be switched back to **Production** without rebuilding.
 
 The web API's CORS policy is an exact allowlist. Add the loaded extension's ID to `ALLOWED_CORS_ORIGINS` in `apps/web/.env`, for example `http://localhost:3000,chrome-extension://abcdefghijklmnop`. Find the ID at `chrome://extensions`.
 

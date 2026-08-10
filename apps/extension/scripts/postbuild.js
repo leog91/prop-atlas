@@ -10,17 +10,6 @@ execSync('bunx esbuild contents/content.ts --bundle --outfile=build/chrome-mv3-p
 console.log('Updating manifest.json...');
 const manifestPath = 'build/chrome-mv3-prod/manifest.json';
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-const apiUrl = process.env.PLASMO_PUBLIC_API_URL || 'http://localhost:3000';
-const apiOrigin = new URL(apiUrl).origin;
-
-if (!apiOrigin.startsWith('http://') && !apiOrigin.startsWith('https://')) {
-  throw new Error('PLASMO_PUBLIC_API_URL must use http or https.');
-}
-
-manifest.host_permissions = Array.from(new Set([
-  ...(manifest.host_permissions || []),
-  `${apiOrigin}/*`,
-]));
 
 manifest.content_scripts = [
   {

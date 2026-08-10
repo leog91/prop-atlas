@@ -14,32 +14,42 @@ const logger = {
 };
 
 type Status = "idle" | "detecting" | "saving" | "saved" | "analyzing" | "analyzed" | "error";
+type ApiEnvironment = "development" | "production";
+
+const API_URLS: Record<ApiEnvironment, string> = {
+  development: "http://localhost:3000",
+  production: "https://prop-atlas-web.vercel.app",
+};
 
 function IndexPopup() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [apiEnvironment, setApiEnvironment] = useState<ApiEnvironment>("production");
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    chrome.storage.local.get(["apiKey"], (result) => {
+    chrome.storage.local.get(["apiKey", "apiEnvironment"], (result) => {
       if (result.apiKey) {
         setApiKey(result.apiKey);
       } else {
         setShowSettings(true);
       }
+      if (result.apiEnvironment === "development" || result.apiEnvironment === "production") {
+        setApiEnvironment(result.apiEnvironment);
+      }
     });
   }, []);
 
   const handleSaveApiKey = () => {
-    chrome.storage.local.set({ apiKey }, () => {
+    chrome.storage.local.set({ apiKey, apiEnvironment }, () => {
       setShowSettings(false);
       setStatus("idle");
       setErrorMsg("");
     });
   };
 
-  const apiUrl = process.env.PLASMO_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = API_URLS[apiEnvironment];
 
   const handleSave = async () => {
     setErrorMsg("");
@@ -181,6 +191,30 @@ function IndexPopup() {
         <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>
           Get your API key from the dashboard:
         </p>
+        <label
+          htmlFor="api-environment"
+          style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}
+        >
+          Environment
+        </label>
+        <select
+          id="api-environment"
+          value={apiEnvironment}
+          onChange={(e) => setApiEnvironment(e.target.value as ApiEnvironment)}
+          style={{
+            width: "100%",
+            padding: "8px 12px",
+            border: "1px solid #d1d5db",
+            borderRadius: 6,
+            fontSize: 13,
+            marginBottom: 12,
+            boxSizing: "border-box",
+            background: "white",
+          }}
+        >
+          <option value="production">Production</option>
+          <option value="development">Development (localhost)</option>
+        </select>
         <a
           href={`${apiUrl}/`}
           target="_blank"
