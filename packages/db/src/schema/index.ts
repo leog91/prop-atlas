@@ -2,22 +2,6 @@ import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-or
 import { sql } from "drizzle-orm";
 import { user } from "./auth";
 
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  name: text("name"),
-  emailVerified: integer("email_verified", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  image: text("image"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
-
 export const properties = sqliteTable(
   "properties",
   {

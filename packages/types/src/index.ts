@@ -62,8 +62,8 @@ export const propertySchema = z.object({
   postalCode: z.string().optional(),
   latitude: z.number().min(-90).max(90).nullish(),
   longitude: z.number().min(-180).max(180).nullish(),
-  images: z.array(z.string().url()).optional(),
-  url: z.string().url(),
+  images: z.array(z.url()).optional(),
+  url: z.url(),
   listedAt: z.string().nullish(),
   views: z.number().int().nonnegative().nullish(),
   deposit: z.number().nonnegative().nullish(),
@@ -72,7 +72,7 @@ export const propertySchema = z.object({
   hasElevator: z.boolean().nullish(),
   hasParking: z.boolean().nullish(),
   isFurnished: z.boolean().nullish(),
-  rawPayload: z.record(z.unknown()).optional(),
+  rawPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ParsedProperty = z.infer<typeof propertySchema>;
