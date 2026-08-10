@@ -11,6 +11,7 @@
     "dev-local-db": "bun --env-file=apps/web/.env.local-db run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean",
     "db:seed:demo": "bun run --filter @prop-atlas/web db:seed:demo",

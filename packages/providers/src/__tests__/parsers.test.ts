@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { JSDOM } from "jsdom";
 import { DaftParser } from "../parsers/daft";
 import { KamernetParser } from "../parsers/kamernet";
