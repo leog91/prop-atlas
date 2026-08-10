@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { PropertyCard } from "./PropertyCard";
 
 const MapView = dynamic(() => import("./MapView").then((mod) => ({ default: mod.MapView })), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-[500px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-      <p className="text-gray-500">Loading map...</p>
-    </div>
-  ),
+  loading: () => <MapPlaceholder>Loading map...</MapPlaceholder>,
 });
+
+function MapPlaceholder({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-[500px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+      <p className="text-gray-500">{children}</p>
+    </div>
+  );
+}
 
 interface Property {
   id: string;
@@ -41,7 +45,7 @@ interface Property {
   priceHistory?: Array<{ id: string; price: number; currency: string; recordedAt: Date | string }> | null;
 }
 
-interface MapProperty {
+interface MapMarker {
   id: string;
   title: string;
   price: number;
@@ -49,51 +53,72 @@ interface MapProperty {
   city?: string | null;
   listingType: string;
   url: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  rawPayload?: unknown;
+  latitude: number;
+  longitude: number;
+  isApproximate: boolean;
+  radiusMeters: number | null;
 }
 
 interface DashboardContentProps {
   properties: Property[];
-  allProperties: MapProperty[];
+  /** Serialized filters, so the map covers every match rather than this page. */
+  mapQuery: string;
   showDeleted?: boolean;
   readOnly?: boolean;
 }
 
-export function DashboardContent({ properties, allProperties, showDeleted, readOnly }: DashboardContentProps) {
+export function DashboardContent({ properties, mapQuery, showDeleted, readOnly }: DashboardContentProps) {
   const [view, setView] = useState<"list" | "map">("list");
   const [items, setItems] = useState(properties);
-  const [mapItems, setMapItems] = useState(allProperties);
 
-  const handleRemove = (id: string) => {
+  // Markers span every listing matching the filters, so they are fetched only
+  // once the map is actually opened.
+  const [markers, setMarkers] = useState<MapMarker[] | null>(null);
+  const [markersError, setMarkersError] = useState(false);
+
+  useEffect(() => {
+    if (view !== "map" || markers || markersError) return;
+
+    let cancelled = false;
+    fetch(`/api/properties/map?${mapQuery}`)
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setMarkers(data.markers);
+      })
+      .catch(() => {
+        if (!cancelled) setMarkersError(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [view, markers, markersError, mapQuery]);
+
+  const handleRemove = useCallback((id: string) => {
     setItems((prev) => prev.filter((p) => p.id !== id));
-    setMapItems((prev) => prev.filter((p) => p.id !== id));
-  };
+    setMarkers((prev) => prev?.filter((m) => m.id !== id) ?? null);
+  }, []);
 
   return (
     <>
       <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => setView("list")}
-          className={`rounded-md px-3 py-1.5 text-sm ${
-            view === "list"
-              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-              : "border border-gray-300 dark:border-gray-700"
-          }`}
-        >
-          List
-        </button>
-        <button
-          onClick={() => setView("map")}
-          className={`rounded-md px-3 py-1.5 text-sm ${
-            view === "map"
-              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-              : "border border-gray-300 dark:border-gray-700"
-          }`}
-        >
-          Map
-        </button>
+        {(["list", "map"] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setView(mode)}
+            aria-pressed={view === mode}
+            className={`cursor-pointer rounded-md px-3 py-1.5 text-sm ${
+              view === mode
+                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                : "border border-gray-300 dark:border-gray-700"
+            }`}
+          >
+            {mode === "list" ? "List" : "Map"}
+          </button>
+        ))}
       </div>
 
       {view === "list" ? (
@@ -109,21 +134,12 @@ export function DashboardContent({ properties, allProperties, showDeleted, readO
             />
           ))}
         </div>
+      ) : markersError ? (
+        <MapPlaceholder>Could not load map data.</MapPlaceholder>
+      ) : markers ? (
+        <MapView properties={markers} />
       ) : (
-        <MapView
-          properties={mapItems.map((p) => ({
-            id: p.id,
-            title: p.title,
-            price: p.price,
-            currency: p.currency,
-            latitude: p.latitude,
-            longitude: p.longitude,
-            city: p.city,
-            listingType: p.listingType,
-            url: p.url,
-            rawPayload: p.rawPayload,
-          }))}
-        />
+        <MapPlaceholder>Loading map...</MapPlaceholder>
       )}
     </>
   );

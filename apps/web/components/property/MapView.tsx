@@ -15,7 +15,8 @@ interface MapProperty {
   city?: string | null;
   listingType: string;
   url: string;
-  rawPayload?: unknown;
+  isApproximate?: boolean;
+  radiusMeters?: number | null;
 }
 
 interface MapViewProps {
@@ -51,18 +52,7 @@ function formatPrice(price: number, currency: string) {
   }).format(price);
 }
 
-function getLocationMeta(rawPayload: unknown) {
-  const payload = rawPayload as Record<string, unknown> | undefined;
-  const isApproximate =
-    payload?.isApproximateLocation === true ||
-    payload?.locationPrecision === "approximate";
-  const radius = Number(payload?.locationRadiusMeters);
-
-  return {
-    isApproximate,
-    radiusMeters: Number.isFinite(radius) && radius > 0 ? radius : 650,
-  };
-}
+const DEFAULT_APPROXIMATE_RADIUS_METERS = 650;
 
 function hasValidCoordinates(property: MapProperty): property is MapProperty & { latitude: number; longitude: number } {
   return (
@@ -137,15 +127,15 @@ export function MapView({ properties, center, zoom = 5 }: MapViewProps) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {validProperties.map((property) => {
-          const locationMeta = getLocationMeta(property.rawPayload);
+          const isApproximate = property.isApproximate === true;
           const position: [number, number] = [property.latitude, property.longitude];
 
           return (
             <Fragment key={property.id}>
-              {locationMeta.isApproximate && (
+              {isApproximate && (
                 <Circle
                   center={position}
-                  radius={locationMeta.radiusMeters}
+                  radius={property.radiusMeters ?? DEFAULT_APPROXIMATE_RADIUS_METERS}
                   pathOptions={{
                     color: "#d97706",
                     fillColor: "#f59e0b",
@@ -157,7 +147,7 @@ export function MapView({ properties, center, zoom = 5 }: MapViewProps) {
               )}
               <Marker
                 position={position}
-                icon={locationMeta.isApproximate ? approximateIcon : defaultIcon}
+                icon={isApproximate ? approximateIcon : defaultIcon}
               >
                 <Popup>
                   <div className="min-w-[150px]">
@@ -172,7 +162,7 @@ export function MapView({ properties, center, zoom = 5 }: MapViewProps) {
                         </>
                       )}
                     </p>
-                    {locationMeta.isApproximate && (
+                    {isApproximate && (
                       <p className="mt-1 text-xs font-medium text-amber-700">Approximate area</p>
                     )}
                     {property.city && (

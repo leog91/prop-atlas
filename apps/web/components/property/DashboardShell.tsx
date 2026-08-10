@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { eq, and, desc, inArray, like, sql, isNull, isNotNull } from "@prop-atlas/db";
+import { eq, desc, inArray, sql } from "@prop-atlas/db";
 import { properties, savedProperties, propertyImages, propertyPriceHistory } from "@prop-atlas/db";
 import { getDb } from "@/lib/db";
 import { DashboardContent } from "@/components/property/DashboardContent";
 import { ApiKeyManager } from "@/components/ApiKeyManager";
 import { isDemoUser } from "@/lib/demo";
+import { parsePropertyFilters, propertyFilterCondition } from "@/lib/property-filters";
 import Link from "next/link";
 
 interface DashboardShellProps {
@@ -34,38 +35,15 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const limit = 12;
   const offset = (page - 1) * limit;
-  const favoritesOnly = params.favorites === "true";
-  const search = params.search || "";
-  const listingType = params.listingType || "";
-  const provider = params.provider || "";
-  const showDeleted = params.deleted === "true";
+  const filters = parsePropertyFilters(params);
+  const { favoritesOnly, showDeleted, search, listingType, provider } = filters;
   const isDemo = isDemoUser(session.user);
   const showDemoSummary = isDemo && !showDeleted && !favoritesOnly && !search && !listingType && !provider;
 
   const db = getDb();
+  const filterCondition = propertyFilterCondition(session.user.id, filters);
 
-  const conditions = [eq(savedProperties.userId, session.user.id)];
-  if (showDeleted) {
-    conditions.push(isNotNull(savedProperties.deletedAt));
-  } else {
-    conditions.push(isNull(savedProperties.deletedAt));
-  }
-  if (favoritesOnly) {
-    conditions.push(eq(savedProperties.isFavorite, true));
-  }
-
-  const propertyConditions = [];
-  if (search) {
-    propertyConditions.push(like(properties.title, `%${search}%`));
-  }
-  if (listingType) {
-    propertyConditions.push(eq(properties.listingType, listingType));
-  }
-  if (provider) {
-    propertyConditions.push(eq(properties.provider, provider));
-  }
-
-  const [results, countResult, allResults] = await Promise.all([
+  const [results, countResult, summaryResult] = await Promise.all([
     db
       .select({
         property: properties,
@@ -73,7 +51,7 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
       })
       .from(savedProperties)
       .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
-      .where(and(...conditions, ...propertyConditions))
+      .where(filterCondition)
       .orderBy(desc(savedProperties.savedAt))
       .limit(limit)
       .offset(offset),
@@ -81,30 +59,19 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
       .select({ count: sql<number>`count(*)` })
       .from(savedProperties)
       .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
-      .where(and(...conditions, ...propertyConditions)),
-    db
-      .select({
-        property: {
-          id: properties.id,
-          title: properties.title,
-          price: properties.price,
-          currency: properties.currency,
-          latitude: properties.latitude,
-          longitude: properties.longitude,
-          city: properties.city,
-          country: properties.country,
-          provider: properties.provider,
-          views: properties.views,
-          listingType: properties.listingType,
-          url: properties.url,
-          rawPayload: properties.rawPayload,
-        },
-        saved: savedProperties,
-      })
-      .from(savedProperties)
-      .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
-      .where(and(...conditions, ...propertyConditions))
-      .orderBy(desc(savedProperties.savedAt)),
+      .where(filterCondition),
+    // Aggregated in SQL rather than by loading every row into the server component.
+    showDemoSummary
+      ? db
+          .select({
+            providerCount: sql<number>`count(distinct ${properties.provider})`,
+            mappedCount: sql<number>`sum(case when ${properties.latitude} is not null and ${properties.longitude} is not null then 1 else 0 end)`,
+            sourceViews: sql<number>`coalesce(sum(${properties.views}), 0)`,
+          })
+          .from(savedProperties)
+          .innerJoin(properties, eq(properties.id, savedProperties.propertyId))
+          .where(filterCondition)
+      : Promise.resolve([]),
   ]);
 
   const total = countResult[0]?.count || 0;
@@ -119,22 +86,10 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
     redirect(`/?${validParams.toString()}`);
   }
 
-  const providerCount = new Set(allResults.map(({ property }) => property.provider)).size;
-  const mappedCount = allResults.filter(({ property }) => property.latitude != null && property.longitude != null).length;
-  const sourceViews = allResults.reduce((sum, { property }) => sum + (property.views || 0), 0);
-
-  const mapData = allResults.map(({ property }) => ({
-    id: property.id,
-    title: property.title,
-    price: property.price,
-    currency: property.currency,
-    latitude: property.latitude,
-    longitude: property.longitude,
-    city: property.city,
-    listingType: property.listingType,
-    url: property.url,
-    rawPayload: property.rawPayload,
-  }));
+  const summary = summaryResult[0];
+  const providerCount = summary?.providerCount ?? 0;
+  const mappedCount = summary?.mappedCount ?? 0;
+  const sourceViews = summary?.sourceViews ?? 0;
 
   const propertyIds = results.map((r) => r.property.id);
   const [images, priceHistory] = propertyIds.length
@@ -364,7 +319,11 @@ export async function DashboardShell({ searchParams }: DashboardShellProps) {
             <DashboardContent
               key={data.map((d) => d.id).join(",")}
               properties={data}
-              allProperties={mapData}
+              mapQuery={new URLSearchParams(
+                Object.entries(params).filter(
+                  (entry): entry is [string, string] => entry[0] !== "page" && !!entry[1]
+                )
+              ).toString()}
               showDeleted={showDeleted}
               readOnly={isDemo}
             />
