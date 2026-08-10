@@ -13,7 +13,12 @@ BETTER_AUTH_SECRET=your-generated-secret
 BETTER_AUTH_URL=https://your-domain.com
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 ALLOWED_CORS_ORIGINS=https://your-domain.com,chrome-extension://your-extension-id
+NOMINATIM_CONTACT=https://your-domain.com
 ```
+
+`NOMINATIM_CONTACT` is sent in the geocoder's `User-Agent`, which OpenStreetMap's
+usage policy requires so they can reach you about traffic. It falls back to
+`NEXT_PUBLIC_APP_URL` when unset.
 
 Generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`. Never expose the Turso token or auth secret with a `NEXT_PUBLIC_` prefix.
 
@@ -34,6 +39,13 @@ bun run --filter @prop-atlas/db generate:production
 ```
 
 The older `packages/db/drizzle/` directory is local-only and not a production migration source.
+
+### Breaking change: hashed API keys
+
+Migration `0002_drop_plaintext_api_keys` replaces the stored plaintext API key
+with a SHA-256 hash. Existing keys cannot be rehashed in SQL, so the migration
+deletes them. After applying it, every user must generate a new key on the
+dashboard and repaste it into the extension.
 
 ## Extension
 

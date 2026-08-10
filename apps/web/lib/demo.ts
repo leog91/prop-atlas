@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 export const DEMO_EMAIL = "demo@propatlas.com";
 
 export function isDemoUser(user: { email?: string | null }) {
@@ -5,7 +7,7 @@ export function isDemoUser(user: { email?: string | null }) {
 }
 
 export function demoReadOnlyResponse() {
-  return Response.json(
+  return NextResponse.json(
     { error: "The demo account is read-only." },
     { status: 403 }
   );
